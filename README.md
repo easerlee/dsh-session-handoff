@@ -20,7 +20,8 @@ compaction 是**就地压缩**——用摘要替换原文，历史被改写。�
 
 一个 DSH 插件 = 一个 npm 包（`main` + `dsh.bundle.patch`）+ 在活动 profile 里登记两处。
 
-1. 把本仓库放到**任意目录**，但别放客户端安装目录里（升级/重装会被清掉）。
+1. 把本仓库放到 DSH 自己的目录下，例如 `~/.dsh/plugins/dsh-handoff`
+   （Windows：`C:\Users\<你>\.dsh\plugins\dsh-handoff`）——别放客户端安装目录里，升级/重装会被清掉。
 2. 活动 profile 目录（Windows：`C:\Users\<你>\.dsh\profiles\<名字>`）：
    - `package.json`：`dependencies` 加 `"dsh-handoff": "file:/绝对路径/dsh-handoff"`，
      并在 `dsh.profile.bundles` 数组里加 `"dsh-handoff"`；
