@@ -1,7 +1,6 @@
 {
-  "name": "dsh-handoff",
+  "name": "dsh-session-handoff",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
   "main": "lib/index.js",
   "description": "DSH 插件：上下文压力到阈值时，把当前工作交接给一个新会话（文件式交接包 + handoff_now 工具 + HTTP 接口）。",

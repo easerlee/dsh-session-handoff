@@ -17,15 +17,16 @@ reviewable handoff package**, leaving the old session untouched.
 ## Install
 
 ```bash
-dsh plugin --profile <your profile> add github:easerlee/dsh-handoff
+dsh plugin --profile <your profile> add dsh-session-handoff
 ```
 
 Then **restart DSH** — the bundle list is read once at startup.
 
+- The npm package is `dsh-session-handoff` (`dsh-handoff` was taken by another plugin); the repo is still dsh-handoff
 - The desktop profile is `desktop`, the web one is `web`; the command writes the package into the
   profile's `dependencies` *and* `dsh.profile.bundles`, so no manual file editing is needed
 - If `dsh` is not on your PATH, use `resources\runtime\cli\bin\dsh.cmd` inside the install directory
-- Once published to npm you can `add dsh-handoff` directly
+- Without npm: `add github:easerlee/dsh-handoff` (same code, just pulled from the repo each time)
 - **Working on a local checkout?** use `add link:/absolute/path/to/dsh-handoff` — a `file:` dependency is
   copied by pnpm, so later source edits do not take effect
 

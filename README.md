@@ -16,15 +16,16 @@ DSH 插件：上下文压力到阈值时，把当前工作**交接给一个新�
 ## 安装
 
 ```bash
-dsh plugin --profile <你的 profile> add github:easerlee/dsh-handoff
+dsh plugin --profile <你的 profile> add dsh-session-handoff
 ```
 
 装完**重启 DSH**——bundle 列表只在启动时读一次。
 
+- npm 包名是 `dsh-session-handoff`（`dsh-handoff` 已被另一个插件占用），仓库仍叫 dsh-handoff
 - 桌面端的 profile 是 `desktop`，web 端是 `web`；一条命令会同时把包写进 `dependencies` 和
   `dsh.profile.bundles`，不用手动改文件
 - `dsh` 不在 PATH 上时，用它安装目录里的 `resources\runtime\cli\bin\dsh.cmd`
-- 已发布到 npm 后可以直接 `add dsh-handoff`
+- 不走 npm 也行：`add github:easerlee/dsh-handoff`（同样的代码，只是每次装都拉仓库）
 - **改本地源码**用 `add link:/绝对路径/dsh-handoff`：`file:` 会被 pnpm 复制成快照，之后改源码不生效
 
 确认挂上了（web 端 / 命令行）：
