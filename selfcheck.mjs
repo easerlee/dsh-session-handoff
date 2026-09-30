@@ -10,7 +10,7 @@
  * Electron 的 fs 读得到。普通 node 跑必失败，那是环境不对，不是插件坏。
  *
  *   $env:ELECTRON_RUN_AS_NODE=1
- *   & "E:\dsh\DeepSeek Harness.exe" "E:\dsh-handoff\selfcheck.mjs"
+ *   & "E:\dsh\DeepSeek Harness.exe" "<本仓库>\selfcheck.mjs"
  */
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -88,7 +88,15 @@ try {
   }
   await mod.apply(ctx, { enabled: false, handoffDir: outDir })
   if (!registered || registered.name !== 'handoff_now') throw new Error('apply 没注册出 handoff_now 工具')
-  const session = { id: 'session-selftest-0000', snapshotEvents: () => [] }
+  const session = {
+    id: 'session-selftest-0000',
+    // 这两个 tool/call 专钉「文件清单里的垃圾条目」：引号包住的整条命令、写进文件里的散文、
+    // <you>/$id 占位串、带空格的真路径 —— 全都在线上真出过一次。
+    snapshotEvents: () => [
+      { type: 'tool/call', data: { name: 'pwsh', arguments: { command: 'Get-Item "E:/AO/ao-mcp-launcher.mjs 存在吗: "' } } },
+      { type: 'tool/call', data: { name: 'write', arguments: { file_path: 'E:/Legend of Lhoba/NewProject/a.txt', content: '见 E:/dsh-handoff（工作区外），装到 C:/Users/<you>/.dsh/plugins/dsh-handoff。' } } },
+    ],
+  }
   const wired = await registered.execute({ reason: '接线自检', dryRun: true }, { agent: { session }, cwd: outDir })
   checkKeys(wired, '假 ctx 试跑')
   if (wired.ok !== true || wired.dryRun !== true) throw new Error('假 ctx 试跑没走 dryRun 分支（十有八九是实现里没把参数传下去）：' + JSON.stringify(wired))
@@ -98,6 +106,15 @@ try {
   if (!/接线自检/.test(body)) throw new Error('交接包没带上 reason')
   if (wired.newTitle.indexOf('自检标题') !== 0) throw new Error('标题没从 sessionTitle.get() 的 snapshot.title 读到（旧会话也就不会被加 [已交接]）：' + wired.newTitle)
   if (!/^自检标题（接 \d{2}-\d{2}）$/.test(wired.newTitle)) throw new Error('标题没剥掉上一轮的「（接 HH-MM）」或时间戳不是本地 HH-MM：' + wired.newTitle)
+  // 文件清单：真路径要在，垃圾条目一个都不能有
+  const listed = (body.match(/## 改动过的文件[\s\S]*?(?=\n## )/) || [''])[0]
+    .split('\n').filter((l) => l.startsWith('- ')).map((l) => l.slice(2))
+  for (const want of ['E:/AO/ao-mcp-launcher.mjs', 'E:/Legend of Lhoba/NewProject/a.txt']) {
+    if (listed.indexOf(want) < 0) throw new Error('文件清单漏了 ' + want + '：' + listed.join(' | '))
+  }
+  const dirty = listed.filter((p) => /[（），。；：！？<>$]|[\\/]$/.test(p))
+  if (dirty.length > 0) throw new Error('文件清单里有垃圾条目：' + dirty.join(' | '))
+  console.log('文件清单 ok: ' + listed.join(' | '))
   console.log('假 ctx 试跑 ok: ' + wired.filePath + '（' + body.length + ' 字），新标题「' + wired.newTitle + '」')
   rmSync(outDir, { recursive: true, force: true })
 
