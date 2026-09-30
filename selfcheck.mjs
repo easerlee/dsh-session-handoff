@@ -80,8 +80,11 @@ try {
     connection: { fetch: { register() {} } },
     tools: { register(t) { registered = t } },
     on() {},
-    // 标题在这个版本里只挂在 sessionTitle 服务/投影上，session 对象上是空的 —— 这条钉住读取路径。
-    sessionTitle: { get: () => '自检标题' },
+    // 标题只挂在会话日志的 session/title 事件上，session 对象里没有 —— 这条钉住读取路径。
+    // 注意形状：get() 返回的是 snapshot 对象 { title, messageSeqs, source, eventSeq, updatedAt }，
+    // 不是字符串（漏了 .title 就会静默掉回兜底标题，线上真出过一次）。带上一轮的「（接 ..）」
+    // 是为了同时钉住"重复交接不叠时间戳"。
+    sessionTitle: { get: () => ({ title: '自检标题（接 01-02）', messageSeqs: [], source: { kind: 'user' }, eventSeq: 1, updatedAt: 0 }) },
   }
   await mod.apply(ctx, { enabled: false, handoffDir: outDir })
   if (!registered || registered.name !== 'handoff_now') throw new Error('apply 没注册出 handoff_now 工具')
@@ -93,8 +96,8 @@ try {
   const body = readFileSync(wired.filePath, 'utf8')
   if (!body.startsWith('# 交接包')) throw new Error('交接包内容不对')
   if (!/接线自检/.test(body)) throw new Error('交接包没带上 reason')
-  if (wired.newTitle.indexOf('自检标题') !== 0) throw new Error('标题没从 sessionTitle.get 读到（旧会话也就不会被加 [已交接]）：' + wired.newTitle)
-  if (!/（接 \d{2}-\d{2}）$/.test(wired.newTitle)) throw new Error('标题时间戳不是本地 HH-MM：' + wired.newTitle)
+  if (wired.newTitle.indexOf('自检标题') !== 0) throw new Error('标题没从 sessionTitle.get() 的 snapshot.title 读到（旧会话也就不会被加 [已交接]）：' + wired.newTitle)
+  if (!/^自检标题（接 \d{2}-\d{2}）$/.test(wired.newTitle)) throw new Error('标题没剥掉上一轮的「（接 HH-MM）」或时间戳不是本地 HH-MM：' + wired.newTitle)
   console.log('假 ctx 试跑 ok: ' + wired.filePath + '（' + body.length + ' 字），新标题「' + wired.newTitle + '」')
   rmSync(outDir, { recursive: true, force: true })
 
