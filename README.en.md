@@ -139,6 +139,14 @@ It has to run under the Electron runtime — packaged builds keep `@deepseek-ai/
 which plain node cannot resolve. No extra setup is needed on packaged builds: the plugin resolves those
 modules through the harness entry point itself.
 
+⚠️ **With a `link:` install, unlink before switching install methods** — pnpm's `remove` can delete
+through the junction and affect files in the repository itself. Unlink first, then `add`:
+
+```powershell
+cmd /c rmdir "<profile dir>\node_modules\dsh-session-handoff"
+dsh plugin --profile <profile> add <new spec>
+```
+
 ## License
 
 MIT

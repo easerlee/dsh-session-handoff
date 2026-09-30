@@ -131,6 +131,14 @@ $env:ELECTRON_RUN_AS_NODE=1
 必须用 Electron 运行时跑——打包版把 `@deepseek-ai/*` 放在 `app.asar` 里，普通 node 解不出来。
 插件在打包版下无需额外配置：它会自己从 harness 入口解析这些模块。
 
+⚠️ **`link:` 装法下切换安装方式前，先解除链接**：pnpm 的 `remove` 可能沿 junction 删除，影响仓库自身的文件。
+先断链，再 `add`：
+
+```powershell
+cmd /c rmdir "<profile 目录>\node_modules\dsh-session-handoff"
+dsh plugin --profile <profile> add <新的装法>
+```
+
 ## License
 
 MIT

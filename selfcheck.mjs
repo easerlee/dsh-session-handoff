@@ -10,7 +10,7 @@
  * Electron 的 fs 读得到。普通 node 跑必失败，那是环境不对，不是插件坏。
  *
  *   $env:ELECTRON_RUN_AS_NODE=1
- *   & "E:\dsh\DeepSeek Harness.exe" "<本仓库>\selfcheck.mjs"
+ *   & "<DSH 安装目录>\DeepSeek Harness.exe" "<本仓库>\selfcheck.mjs"
  */
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
