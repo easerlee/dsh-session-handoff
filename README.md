@@ -10,7 +10,7 @@ DSH 插件：上下文压力到阈值时，把当前工作**交接给一个新�
 
 - 按**真实上下文压力**触发，不是猜轮数
 - 交接包**从会话自身机械提取**（改动过的文件、最近消息、停在哪儿），落盘可审阅
-- 桌面端 `handoff_now` 工具（支持 `dryRun` 试跑）/ 命令行走 HTTP 接口
+- 桌面端 `handoff_now` 工具（支持 `dryRun` 试跑）/ web 端与命令行走 HTTP 接口
 - 旧会话**只改名加 ` [已交接]`**，不归档不删除
 
 ## 安装
@@ -21,9 +21,18 @@ dsh plugin --profile <你的 profile> add github:easerlee/dsh-handoff
 
 装完**重启 DSH**——bundle 列表只在启动时读一次。
 
-- 这条命令会把包写进 profile 的 `dependencies` 和 `dsh.profile.bundles`，不用手动改文件
+- 桌面端的 profile 是 `desktop`，web 端是 `web`；一条命令会同时把包写进 `dependencies` 和
+  `dsh.profile.bundles`，不用手动改文件
 - `dsh` 不在 PATH 上时，用它安装目录里的 `resources\runtime\cli\bin\dsh.cmd`
-- 已发布到 npm 后可以直接 `add dsh-handoff`；改本地源码时用 `add file:/绝对路径/dsh-handoff`
+- 已发布到 npm 后可以直接 `add dsh-handoff`
+- **改本地源码**用 `add link:/绝对路径/dsh-handoff`：`file:` 会被 pnpm 复制成快照，之后改源码不生效
+
+确认挂上了（web 端 / 命令行）：
+
+```bash
+curl "http://127.0.0.1:<端口>/api/handoff/status"
+# {"ok":true,...,"tool":"registered"}   ← tool 为 registered 说明 handoff_now 工具也注册成功
+```
 
 ## 用法
 
@@ -38,7 +47,7 @@ dsh plugin --profile <你的 profile> add github:easerlee/dsh-handoff
 handoff_now(dryRun: true)     # 只落盘，不建会话、不改旧会话名
 ```
 
-### 命令行 / dsh web：HTTP 接口
+### web 端 / 命令行：HTTP 接口
 
 ```bash
 # 手动触发（不传 sessionId 就取最近一个活跃会话）
@@ -50,7 +59,8 @@ curl -X POST http://127.0.0.1:<端口>/api/handoff/run \
 curl http://127.0.0.1:<端口>/api/handoff/status
 ```
 
-Web 版地址栏里的 `?token=` 就是凭证；桌面端没有地址栏，只能开 DevTools 从 `location.href` 里抠。
+`dsh web` 地址栏里的 `?token=` 是凭证（先访问一次 `/` 让 cookie 落下来，之后 API 才认）；桌面端
+没有地址栏，手动触发走上面的工具。
 
 ### 自动触发
 
@@ -105,6 +115,8 @@ compaction 管日常，handoff 当安全网 + 手动换新会话。
 1. **界面不会自动切**——新会话建好后返回 id 与标题，需手动在会话列表里点过去
 2. **交接包是机械提取，不是模型总结**——复杂任务可能不够精确
 3. 旧会话只改名不归档（有意）
+4. HTTP 接口只作用于**该宿主进程里活跃的会话**：刚起来、还没开过会话的实例会返回
+   `没有可用会话（session 缺失）`
 
 ## 开发
 

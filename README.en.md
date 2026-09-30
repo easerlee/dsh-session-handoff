@@ -11,7 +11,7 @@ reviewable handoff package**, leaving the old session untouched.
 - Triggered by **real context pressure**, not a guessed turn count
 - The package is **extracted mechanically from the session itself** (files it touched, recent messages,
   where the last message stopped) and written to disk for review
-- `handoff_now` tool in the desktop app (with a `dryRun` mode) / HTTP endpoints for the CLI
+- `handoff_now` tool in the desktop app (with a `dryRun` mode) / HTTP endpoints for `dsh web` and the CLI
 - The old session is **only renamed with ` [已交接]`** — never archived, never deleted
 
 ## Install
@@ -22,11 +22,19 @@ dsh plugin --profile <your profile> add github:easerlee/dsh-handoff
 
 Then **restart DSH** — the bundle list is read once at startup.
 
-- The command writes the package into the profile's `dependencies` *and* `dsh.profile.bundles`; no manual
-  file editing needed
+- The desktop profile is `desktop`, the web one is `web`; the command writes the package into the
+  profile's `dependencies` *and* `dsh.profile.bundles`, so no manual file editing is needed
 - If `dsh` is not on your PATH, use `resources\runtime\cli\bin\dsh.cmd` inside the install directory
-- Once published to npm you can `add dsh-handoff` directly; when hacking on a local checkout use
-  `add file:/absolute/path/to/dsh-handoff`
+- Once published to npm you can `add dsh-handoff` directly
+- **Working on a local checkout?** use `add link:/absolute/path/to/dsh-handoff` — a `file:` dependency is
+  copied by pnpm, so later source edits do not take effect
+
+Check it is live (web / CLI):
+
+```bash
+curl "http://127.0.0.1:<port>/api/handoff/status"
+# {"ok":true,...,"tool":"registered"}   ← "registered" means the handoff_now tool is registered too
+```
 
 ## Usage
 
@@ -41,7 +49,7 @@ To review the package first without creating a session:
 handoff_now(dryRun: true)     # writes the package only — no new session, no rename
 ```
 
-### CLI / `dsh web`: HTTP endpoints
+### `dsh web` / CLI: HTTP endpoints
 
 ```bash
 # trigger manually (omit sessionId to use the most recent active session)
@@ -53,8 +61,8 @@ curl -X POST http://127.0.0.1:<port>/api/handoff/run \
 curl http://127.0.0.1:<port>/api/handoff/status
 ```
 
-On `dsh web` the `?token=` in the address bar is the credential. The desktop app has no address bar —
-open DevTools and read it from `location.href`.
+On `dsh web`, the `?token=` in the address bar is the credential (visit `/` once so the cookie is set —
+API calls are rejected before that). The desktop app has no address bar; trigger it with the tool above.
 
 ### Automatic
 
@@ -113,6 +121,8 @@ Want handoff to be the main mechanism? Set `compaction-basic` back to `disabled:
    the session list
 2. **The package is mechanically extracted, not model-summarised** — complex tasks may lose nuance
 3. The old session is renamed, not archived (intentional)
+4. The HTTP endpoints only act on sessions **live in that host process**: a freshly started instance with
+   no session opened yet answers `没有可用会话（session 缺失）`
 
 ## Development
 
