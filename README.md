@@ -4,35 +4,57 @@
 
 DSH 插件：上下文压力到阈值时，把当前工作**交接给一个新会话**。
 
-长会话到后段会退化（实测约 70% 上下文后开始出现「只思考不输出」）。DSH 原生的 cleanup
-compaction 是**就地压缩**——用摘要替换原文，历史被改写。这个插件走另一条路：
-**开一个新会话 + 一份可审阅的交接包**，旧会话原样留着。
+长会话到后段会退化（实测约 70% 上下文后开始出现「只思考不输出」）。DSH 原生的 compaction 是
+**就地压缩**——用摘要替换原文，历史被改写。本插件走另一条路：**开一个新会话 + 一份可审阅的
+交接包**，旧会话原样留着。
 
-## 特性
+- 按**真实上下文压力**触发，不是猜轮数
+- 交接包**从会话自身机械提取**（改动过的文件、最近消息、停在哪儿），落盘可审阅
+- 桌面端 `handoff_now` 工具（支持 `dryRun` 试跑）/ 命令行走 HTTP 接口
+- 旧会话**只改名加 ` [已交接]`**，不归档不删除
 
-- **按真实上下文压力触发**：读 `contextPressure` 投影的 `surfaceTokens / contextWindow`，
-  不是猜轮数或消息条数
-- **交接包从会话自身机械提取**：改动过的文件、最近用户消息、最后一条助手消息停在哪儿；
-  写成文件落盘在 `<工作区>/.dsh/handoff/<时间戳>-<会话尾号>.md`，可审阅、可追溯
-- **两个手动入口**：桌面端调 `handoff_now` 工具（支持 `dryRun` 试跑）；命令行 / dsh web 走 HTTP 接口
-- **旧会话只改名加 ` [已交接]`**，不归档不删除
-- **单插件自洽**：不依赖任何配套插件、不依赖个人记忆档案
+## 安装
 
-## 装法
+```bash
+dsh plugin --profile <你的 profile> add github:easerlee/dsh-handoff
+```
 
-一个 DSH 插件 = 一个 npm 包（`main` + `dsh.bundle.patch`）+ 在活动 profile 里登记两处。
+装完**重启 DSH**——bundle 列表只在启动时读一次。
 
-1. 把本仓库放到 DSH 自己的目录下，例如 `~/.dsh/plugins/dsh-handoff`
-   （Windows：`C:\Users\<你>\.dsh\plugins\dsh-handoff`）——别放客户端安装目录里，升级/重装会被清掉。
-2. 活动 profile 目录（Windows：`C:\Users\<你>\.dsh\profiles\<名字>`）：
-   - `package.json`：`dependencies` 加 `"dsh-handoff": "file:/绝对路径/dsh-handoff"`，
-     并在 `dsh.profile.bundles` 数组里加 `"dsh-handoff"`；
-   - `cordis.patch.yml`：加「配置」一节里的那个块。
-3. 在 profile 目录里 `pnpm install`，把 `file:` 依赖链进来。
-4. **重启 DSH**——bundle 列表只在启动时读一次，改完源码同样要重启。
+- 这条命令会把包写进 profile 的 `dependencies` 和 `dsh.profile.bundles`，不用手动改文件
+- `dsh` 不在 PATH 上时，用它安装目录里的 `resources\runtime\cli\bin\dsh.cmd`
+- 已发布到 npm 后可以直接 `add dsh-handoff`；改本地源码时用 `add file:/绝对路径/dsh-handoff`
 
-打包版（代码压在 `resources/app.asar` 里）无需额外配置：插件会自己从 harness 入口解析
-`@deepseek-ai/*`。
+## 用法
+
+### 桌面端：`handoff_now` 工具（推荐）
+
+> 你：「帮我交接一下，换个新会话」
+> agent：调 `handoff_now` → 返回新会话 id / 标题 / 交接包路径
+
+第一次想先看交接包质量、不想真建会话：
+
+```
+handoff_now(dryRun: true)     # 只落盘，不建会话、不改旧会话名
+```
+
+### 命令行 / dsh web：HTTP 接口
+
+```bash
+# 手动触发（不传 sessionId 就取最近一个活跃会话）
+curl -X POST http://127.0.0.1:<端口>/api/handoff/run \
+  -H "content-type: application/json" \
+  -d '{"reason":"手动换会话"}'
+
+# 状态与上次结果
+curl http://127.0.0.1:<端口>/api/handoff/status
+```
+
+Web 版地址栏里的 `?token=` 就是凭证；桌面端没有地址栏，只能开 DevTools 从 `location.href` 里抠。
+
+### 自动触发
+
+压力到 `thresholdRatio` 且距上次交接超过 `cooldownMs` 就自动交接——但先看「与 compaction 的关系」。
 
 ## 配置
 
@@ -64,37 +86,6 @@ compaction 是**就地压缩**——用摘要替换原文，历史被改写。�
 
 ⚠️ patch 的 `config` 是**整段替换**，覆盖时必须把不想改的键一起写上。
 
-## 用法
-
-### 桌面端：`handoff_now` 工具（推荐）
-
-> 你：「帮我交接一下，换个新会话」
-> agent：调 `handoff_now` → 返回新会话 id / 标题 / 交接包路径
-
-第一次想先看交接包质量、不想真建会话：
-
-```
-handoff_now(dryRun: true)     # 只落盘，不建会话、不改旧会话名
-```
-
-### 命令行 / dsh web：HTTP 接口
-
-```bash
-# 手动触发（不传 sessionId 就取最近一个活跃会话）
-curl -X POST http://127.0.0.1:<端口>/api/handoff/run \
-  -H "content-type: application/json" \
-  -d '{"reason":"手动换会话"}'
-
-# 状态与上次结果
-curl http://127.0.0.1:<端口>/api/handoff/status
-```
-
-Web 版地址栏里的 `?token=` 就是凭证；桌面端没有地址栏，只能开 DevTools 从 `location.href` 里抠。
-
-### 自动触发
-
-压力到 `thresholdRatio` 且距上次交接超过 `cooldownMs` 就自动交接——但先看下一节。
-
 ## 与 compaction 的关系
 
 两个都开着时，**阈值不同**：
@@ -117,13 +108,15 @@ compaction 管日常，handoff 当安全网 + 手动换新会话。
 
 ## 开发
 
+改完源码先跑自检（真跑一遍 `apply`、注册出来的 `handoff_now` 工具、`dryRun` 分支和交接包落盘）：
+
 ```powershell
-# 自检：真跑一遍 apply、注册出来的 handoff_now 工具、dryRun 分支和交接包落盘
 $env:ELECTRON_RUN_AS_NODE=1
 & "<DSH 安装目录>\DeepSeek Harness.exe" "<本仓库>\selfcheck.mjs"
 ```
 
 必须用 Electron 运行时跑——打包版把 `@deepseek-ai/*` 放在 `app.asar` 里，普通 node 解不出来。
+插件在打包版下无需额外配置：它会自己从 harness 入口解析这些模块。
 
 ## License
 
