@@ -78,7 +78,7 @@ In the profile's `cordis.patch.yml`:
 - id: dsh-handoff
   config:
     enabled: true
-    thresholdRatio: 0.85
+    thresholdRatio: 0.85     # shipped default is 0.6; raise it when running with compaction
     cooldownMs: 300000
     handoffDir: .dsh/handoff
     recentMessages: 14
@@ -90,7 +90,7 @@ In the profile's `cordis.patch.yml`:
 | Key | Default | Description |
 |---|---|---|
 | `enabled` | `true` | When off, only the HTTP endpoints and the tool remain, no automatic handoff |
-| `thresholdRatio` | `0.85` | Pressure ratio that triggers a handoff (0.85 = 85%) |
+| `thresholdRatio` | `0.6` | Pressure ratio that triggers a handoff (0.6 = 60%); raise it when running alongside compaction, see below |
 | `cooldownMs` | `300000` | Minimum gap between two handoffs of the same session |
 | `handoffDir` | `.dsh/handoff` | Where packages are written (relative to the workspace; absolute works too) |
 | `recentMessages` | `14` | How many recent user messages go into the package |
@@ -106,15 +106,18 @@ With both enabled, the thresholds differ:
 
 | | Threshold | Behaviour |
 |---|---|---|
-| `compaction-basic` | `0.6` | Compress in place, the session keeps going |
-| `dsh-handoff` | `0.85` | Open a new session and hand off |
+| `compaction-basic` | `0.6` (default) | Compress in place, the session keeps going |
+| `dsh-handoff` | `0.85` (suggested, above compaction) | Open a new session and hand off |
+
+The shipped default is `0.6` as well, the same as compaction's: both sets of trigger conditions are then
+met at once, so raise `thresholdRatio` when running the two together.
 
 Compaction pushes pressure back below 0.6 first, so **the automatic handoff rarely ever fires**. That is
 intentional: compaction handles the daily grind, handoff is the safety net plus a manual "fresh session"
 button.
 
-Want handoff to be the main mechanism? Set `compaction-basic` back to `disabled: true` and lower
-`thresholdRatio` to `0.6`.
+Want handoff to be the main mechanism? Set `compaction-basic` back to `disabled: true`; keep
+`thresholdRatio` at the shipped default of `0.6`.
 
 ## Known limitations
 

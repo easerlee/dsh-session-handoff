@@ -4,7 +4,7 @@
 
 DSH 插件：上下文压力到阈值时，把当前工作**交接给一个新会话**。
 
-长会话到后段会退化（实测约 70% 上下文后开始出现「只思考不输出」）。DSH 原生的 compaction 是
+长会话到后段会退化（作者自测：约 70% 上下文后开始出现「只思考不输出」）。DSH 原生的 compaction 是
 **就地压缩**——用摘要替换原文，历史被改写。本插件走另一条路：**开一个新会话 + 一份可审阅的
 交接包**，旧会话原样留着。
 
@@ -75,7 +75,7 @@ curl http://127.0.0.1:<端口>/api/handoff/status
 - id: dsh-handoff
   config:
     enabled: true
-    thresholdRatio: 0.85
+    thresholdRatio: 0.85     # 出厂默认 0.6；与 compaction 一起用时调高
     cooldownMs: 300000
     handoffDir: .dsh/handoff
     recentMessages: 14
@@ -87,7 +87,7 @@ curl http://127.0.0.1:<端口>/api/handoff/status
 | 键 | 默认 | 说明 |
 |---|---|---|
 | `enabled` | `true` | 关掉就只留 HTTP 接口与工具，不做自动交接 |
-| `thresholdRatio` | `0.85` | 压力到多少比例触发（0.85 = 85%） |
+| `thresholdRatio` | `0.6` | 压力到多少比例触发（0.6 = 60%）。与 compaction 一起用时调高，见下 |
 | `cooldownMs` | `300000` | 同一会话两次交接的最小间隔 |
 | `handoffDir` | `.dsh/handoff` | 交接包落盘目录（相对工作区；写绝对路径也行） |
 | `recentMessages` | `14` | 交接包里带多少条最近用户消息 |
@@ -103,13 +103,16 @@ curl http://127.0.0.1:<端口>/api/handoff/status
 
 | | 阈值 | 行为 |
 |---|---|---|
-| `compaction-basic` | `0.6` | 就地压缩，会话继续用 |
-| `dsh-handoff` | `0.85` | 开新会话交接 |
+| `compaction-basic` | `0.6`（默认） | 就地压缩，会话继续用 |
+| `dsh-handoff` | `0.85`（建议值，高于 compaction） | 开新会话交接 |
+
+插件出厂默认也是 `0.6`，和 compaction 的默认阈值相同：两个的触发条件会同时满足，所以一起用时把
+`thresholdRatio` 调高。
 
 compaction 会先把压力压到 0.6 以下，所以 **handoff 的自动触发基本不会发生**。这是有意的：
 compaction 管日常，handoff 当安全网 + 手动换新会话。
 
-想让 handoff 当主力：把 `compaction-basic` 设回 `disabled: true`，把 `thresholdRatio` 调到 `0.6`。
+想让 handoff 当主力：把 `compaction-basic` 设回 `disabled: true`，`thresholdRatio` 保持默认的 `0.6` 就行。
 
 ## 已知限制
 
