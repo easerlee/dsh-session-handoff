@@ -112,12 +112,17 @@ window.__ModuleLoader__.load({
       try {
         const keys = ctx && typeof ctx === 'object' ? Object.keys(ctx) : []
         const hints = /open|activate|select|show|focus|goto|navigate|enter|switch/i
+        const promising = /ui|view|tab|room|nav|router|session|workspace|screen|panel|shell|slot/i
         const services = []
+        const full = []
         for (const key of keys) {
           let value = null
           try { value = ctx[key] } catch { continue }
           if (value === null || typeof value !== 'object') continue
-          services.push(key + ': ' + (apiSurface(value).filter((name) => hints.test(name)).join(' ') || '-'))
+          const names = apiSurface(value)
+          services.push(key + ': ' + (names.filter((name) => hints.test(name)).join(' ') || '-'))
+          // 可能管视图的服务，把它的方法全列出来（限长），免得下一次还得再问一轮。
+          if (promising.test(key)) full.push(key + ' => ' + names.slice(0, 60).join(','))
         }
         report({
           event: 'client-probe',
@@ -126,6 +131,7 @@ window.__ModuleLoader__.load({
             url: window.location ? String(window.location.href) : '',
             ctx: keys,
             services,
+            full,
             manager: apiSurface(sessions && sessions.manager ? sessions.manager : null),
             sessions: api,
           },
