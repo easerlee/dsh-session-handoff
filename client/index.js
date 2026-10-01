@@ -105,6 +105,33 @@ window.__ModuleLoader__.load({
       console.info('[dsh-session-handoff] client loaded; open method: ' + (method || '(none found)') + '; sessions api: ' + api.join(','))
       report({ event: 'client-loaded', method, api })
 
+      // 侦察：这个 harness 版本的「切会话」没有公开文档，服务清单只能现场问。
+      // 把注入到本模块的服务、以及像「切视图」的方法名报回去，下一次改动就有据可依。
+      try {
+        const keys = ctx && typeof ctx === 'object' ? Object.keys(ctx) : []
+        const hints = /open|activate|select|show|focus|goto|navigate|enter|switch/i
+        const services = []
+        for (const key of keys) {
+          let value = null
+          try { value = ctx[key] } catch { continue }
+          if (value === null || typeof value !== 'object') continue
+          services.push(key + ': ' + (apiSurface(value).filter((name) => hints.test(name)).join(' ') || '-'))
+        }
+        report({
+          event: 'client-probe',
+          method,
+          detail: {
+            url: window.location ? String(window.location.href) : '',
+            ctx: keys,
+            services,
+            manager: apiSurface(sessions && sessions.manager ? sessions.manager : null),
+            sessions: api,
+          },
+        })
+      } catch (error) {
+        report({ event: 'client-probe-failed', error: String(error) })
+      }
+
       let lastHandled = ''
       let running = true
 
