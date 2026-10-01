@@ -191,7 +191,7 @@ try {
   rmSync(triggerDir, { recursive: true, force: true })
 
   // ── 客户端半边：假 window + 假 fetch + 假 ctx，验「轮询 → 切到新会话」这条线 ──
-  const clientCode = readFileSync(new URL('./client/open.js', import.meta.url), 'utf8')
+  const clientCode = readFileSync(new URL('./client/handoff-client.js', import.meta.url), 'utf8')
 
   async function runClient(label, makeCtx, sessionId) {
     let clientModule = null
