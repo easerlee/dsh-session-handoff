@@ -162,7 +162,7 @@ window.__ModuleLoader__.load({
     }
 
     function apply(ctx) {
-      const target = findSwitch(ctx)
+      let target = findSwitch(ctx)
       report({ event: 'client-loaded', method: target ? target.service + '.' + target.method : '' })
 
       // 侦察：把点名问到的服务的方法面报回去（有界）。找不到切视图接口时这条最关键。
@@ -186,12 +186,6 @@ window.__ModuleLoader__.load({
         })
       } catch (error) {
         report({ event: 'client-probe-failed', error: String(error) })
-      }
-
-      if (target === null) {
-        // 这一版 harness 没有公开的切视图接口 —— 不轮询，不做无用功。
-        report({ event: 'no-open-api', method: '' })
-        return
       }
 
       let lastHandled = ''
@@ -222,10 +216,36 @@ window.__ModuleLoader__.load({
         } catch {}
       }
 
-      const timer = window.setInterval(tick, POLL_MS)
-      const stop = () => { running = false; window.clearInterval(timer) }
-      if (ctx && typeof ctx.effect === 'function') ctx.effect(() => stop, 'dsh-session-handoff: status poll')
-      tick()
+      const startPoll = () => {
+        const timer = window.setInterval(tick, POLL_MS)
+        const stop = () => { running = false; window.clearInterval(timer) }
+        if (ctx && typeof ctx.effect === 'function') ctx.effect(() => stop, 'dsh-session-handoff: status poll')
+        tick()
+      }
+
+      if (target !== null) {
+        startPoll()
+        return
+      }
+
+      // uiWorkspace 等视图服务可能比本模块晚注册：给一段时间反复重问，问到再开工。
+      // 问不到就当这一版 harness 没有公开导航接口 —— 不轮询，不做无用功。
+      let checks = 0
+      const watcher = window.setInterval(() => {
+        checks += 1
+        target = findSwitch(ctx)
+        if (target !== null) {
+          window.clearInterval(watcher)
+          report({ event: 'open-api-ready', method: target.service + '.' + target.method })
+          startPoll()
+          return
+        }
+        if (checks >= 15) {
+          window.clearInterval(watcher)
+          report({ event: 'no-open-api', method: '' })
+        }
+      }, 2000)
+      if (ctx && typeof ctx.effect === 'function') ctx.effect(() => window.clearInterval(watcher), 'dsh-session-handoff: api watcher')
     }
 
     exports.apply = apply
