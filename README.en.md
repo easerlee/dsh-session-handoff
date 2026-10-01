@@ -1,4 +1,4 @@
-# dsh-handoff
+# dsh-session-handoff
 
 English | [中文](README.md)
 
@@ -8,7 +8,7 @@ Long sessions degrade near the end. DSH's built-in compaction compresses *in pla
 original history with a summary. This plugin takes the other road: **open a new session and carry over a
 reviewable handoff package**, leaving the old session untouched.
 
-- Triggered by **real context pressure**, not a guessed turn count
+- Triggered by **real context pressure**, or by **how many times this session has been compacted** — not a guessed turn count
 - The package is **extracted mechanically from the session itself** (files it touched, recent messages,
   where the last message stopped) and written to disk for review
 - `handoff_now` tool in the desktop app (with a `dryRun` mode) / HTTP endpoints for `dsh web` and the CLI
@@ -22,7 +22,7 @@ dsh plugin --profile <your profile> add dsh-session-handoff
 
 Then **restart DSH** — the bundle list is read once at startup.
 
-- The npm package is `dsh-session-handoff` (`dsh-handoff` was taken by another plugin); the repo is still dsh-handoff
+- The npm package is `dsh-session-handoff` (`dsh-handoff` was taken by another plugin)
 - The desktop profile is `desktop`, the web one is `web`; the command writes the package into the
   profile's `dependencies` *and* `dsh.profile.bundles`, so no manual file editing is needed
 - If `dsh` is not on your PATH, use `resources\runtime\cli\bin\dsh.cmd` inside the install directory
@@ -67,8 +67,13 @@ API calls are rejected before that). The desktop app has no address bar; trigger
 
 ### Automatic
 
-A handoff fires once pressure reaches `thresholdRatio` and `cooldownMs` has elapsed — but read
-"Relationship to compaction" first.
+A handoff fires once cooldownMs has elapsed and either condition holds:
+
+- pressure has reached `thresholdRatio`
+- **this session has been compacted `maxCompactions` times** (default 2)
+
+The second one matters: compaction always pushes pressure back below its own threshold, so a
+pressure-only trigger never gets its chance. How the two get along is below.
 
 ## Configuration
 
@@ -79,6 +84,7 @@ In the profile's `cordis.patch.yml`:
   config:
     enabled: true
     thresholdRatio: 0.85     # shipped default is 0.6; raise it when running with compaction
+    maxCompactions: 2        # hand off after this many compactions of the session (0 = pressure only)
     cooldownMs: 300000
     handoffDir: .dsh/handoff
     recentMessages: 14
@@ -91,6 +97,7 @@ In the profile's `cordis.patch.yml`:
 |---|---|---|
 | `enabled` | `true` | When off, only the HTTP endpoints and the tool remain, no automatic handoff |
 | `thresholdRatio` | `0.6` | Pressure ratio that triggers a handoff (0.6 = 60%); raise it when running alongside compaction, see below |
+| `maxCompactions` | `2` | Hand off after this many compactions of the session (`0` = pressure only) |
 | `cooldownMs` | `300000` | Minimum gap between two handoffs of the same session |
 | `handoffDir` | `.dsh/handoff` | Where packages are written (relative to the workspace; absolute works too) |
 | `recentMessages` | `14` | How many recent user messages go into the package |
@@ -109,15 +116,14 @@ With both enabled, the thresholds differ:
 | `compaction-basic` | `0.6` (default) | Compress in place, the session keeps going |
 | `dsh-handoff` | `0.85` (suggested, above compaction) | Open a new session and hand off |
 
-The shipped default is `0.6` as well, the same as compaction's: both sets of trigger conditions are then
-met at once, so raise `thresholdRatio` when running the two together.
+The shipped default is `0.6` as well, the same as compaction's. With both enabled, compaction always
+pushes pressure back below its own threshold first, so **a pressure-only trigger never gets its chance**.
+The handoff therefore also watches the compaction count: once this session has been compacted
+`maxCompactions` times (2 by default) it hands off — compaction handles the daily grind, and enough
+compaction means it is time to move on.
 
-Compaction pushes pressure back below 0.6 first, so **the automatic handoff rarely ever fires**. That is
-intentional: compaction handles the daily grind, handoff is the safety net plus a manual "fresh session"
-button.
-
-Want handoff to be the main mechanism? Set `compaction-basic` back to `disabled: true`; keep
-`thresholdRatio` at the shipped default of `0.6`.
+Want handoff to be the main mechanism (pressure only, no compaction count)? Set `compaction-basic` back
+to `disabled: true`, set `maxCompactions` to `0`, and keep `thresholdRatio` at the shipped default `0.6`.
 
 ## Known limitations
 

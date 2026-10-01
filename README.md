@@ -1,4 +1,4 @@
-# dsh-handoff
+# dsh-session-handoff
 
 [English](README.en.md) | 中文
 
@@ -8,7 +8,7 @@ DSH 插件：上下文压力到阈值时，把当前工作**交接给一个新�
 **就地压缩**——用摘要替换原文，历史被改写。本插件走另一条路：**开一个新会话 + 一份可审阅的
 交接包**，旧会话原样留着。
 
-- 按**真实上下文压力**触发，不是猜轮数
+- 按**真实上下文压力**触发，或按**本会话已被压缩的次数**触发（不是猜轮数）
 - 交接包**从会话自身机械提取**（改动过的文件、最近消息、停在哪儿），落盘可审阅
 - 桌面端 `handoff_now` 工具（支持 `dryRun` 试跑）/ web 端与命令行走 HTTP 接口
 - 旧会话**只改名加 ` [已交接]`**，不归档不删除
@@ -21,7 +21,7 @@ dsh plugin --profile <你的 profile> add dsh-session-handoff
 
 装完**重启 DSH**——bundle 列表只在启动时读一次。
 
-- npm 包名是 `dsh-session-handoff`（`dsh-handoff` 已被另一个插件占用），仓库仍叫 dsh-handoff
+- npm 包名是 `dsh-session-handoff`（`dsh-handoff` 已被另一个插件占用）
 - 桌面端的 profile 是 `desktop`，web 端是 `web`；一条命令会同时把包写进 `dependencies` 和
   `dsh.profile.bundles`，不用手动改文件
 - `dsh` 不在 PATH 上时，用它安装目录里的 `resources\runtime\cli\bin\dsh.cmd`
@@ -65,7 +65,13 @@ curl http://127.0.0.1:<端口>/api/handoff/status
 
 ### 自动触发
 
-压力到 `thresholdRatio` 且距上次交接超过 `cooldownMs` 就自动交接——但先看「与 compaction 的关系」。
+满足任一条件、且距上次交接超过 `cooldownMs` 就自动交接：
+
+- 压力到 `thresholdRatio`
+- **本会话已被压缩 `maxCompactions` 次**（默认 2）
+
+第二个条件是必需的：compaction 每次都会把压力压回它自己的阈值以下，只看压力的话交接等不到触发点。
+两边怎么配合，见下。
 
 ## 配置
 
@@ -76,6 +82,7 @@ curl http://127.0.0.1:<端口>/api/handoff/status
   config:
     enabled: true
     thresholdRatio: 0.85     # 出厂默认 0.6；与 compaction 一起用时调高
+    maxCompactions: 2        # 本会话被 compaction 压过几次就交接（0 = 只看压力）
     cooldownMs: 300000
     handoffDir: .dsh/handoff
     recentMessages: 14
@@ -88,6 +95,7 @@ curl http://127.0.0.1:<端口>/api/handoff/status
 |---|---|---|
 | `enabled` | `true` | 关掉就只留 HTTP 接口与工具，不做自动交接 |
 | `thresholdRatio` | `0.6` | 压力到多少比例触发（0.6 = 60%）。与 compaction 一起用时调高，见下 |
+| `maxCompactions` | `2` | 本会话被 compaction 压过几次就触发交接（`0` = 只看压力） |
 | `cooldownMs` | `300000` | 同一会话两次交接的最小间隔 |
 | `handoffDir` | `.dsh/handoff` | 交接包落盘目录（相对工作区；写绝对路径也行） |
 | `recentMessages` | `14` | 交接包里带多少条最近用户消息 |
@@ -106,13 +114,12 @@ curl http://127.0.0.1:<端口>/api/handoff/status
 | `compaction-basic` | `0.6`（默认） | 就地压缩，会话继续用 |
 | `dsh-handoff` | `0.85`（建议值，高于 compaction） | 开新会话交接 |
 
-插件出厂默认也是 `0.6`，和 compaction 的默认阈值相同：两个的触发条件会同时满足，所以一起用时把
-`thresholdRatio` 调高。
+插件出厂默认也是 `0.6`，和 compaction 的默认阈值相同。两个都开着时，compaction 每次都会先把压力压回
+自己的阈值以下，所以只看压力的话**交接等不到触发点**。交接因此还看压缩次数：本会话被压过
+`maxCompactions` 次（默认 2）就换班——compaction 管日常，压够了就交出去。
 
-compaction 会先把压力压到 0.6 以下，所以 **handoff 的自动触发基本不会发生**。这是有意的：
-compaction 管日常，handoff 当安全网 + 手动换新会话。
-
-想让 handoff 当主力：把 `compaction-basic` 设回 `disabled: true`，`thresholdRatio` 保持默认的 `0.6` 就行。
+想让 handoff 当主力（不看压缩次数、纯按压力交接）：把 `compaction-basic` 设回 `disabled: true`，
+`maxCompactions` 设 `0`，`thresholdRatio` 保持默认的 `0.6`。
 
 ## 已知限制
 

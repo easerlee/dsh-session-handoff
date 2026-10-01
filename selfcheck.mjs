@@ -116,6 +116,57 @@ try {
   if (dirty.length > 0) throw new Error('文件清单里有垃圾条目：' + dirty.join(' | '))
   console.log('文件清单 ok: ' + listed.join(' | '))
   console.log('假 ctx 试跑 ok: ' + wired.filePath + '（' + body.length + ' 字），新标题「' + wired.newTitle + '」')
+
+  // ── 空事件断言：读不到会话日志时必须失败，不许产出一份「全是（无）」的空壳包 ──
+  const empty = await registered.execute({ reason: '空事件自检', dryRun: true }, { agent: { session: { id: 'session-empty', snapshotEvents: () => [] } }, cwd: outDir })
+  checkKeys(empty, '空事件')
+  if (empty.ok !== false) throw new Error('会话事件为空时没中止（会产出空壳交接包）：' + JSON.stringify(empty))
+  if (empty.filePath !== '') throw new Error('空事件中止了却还是落了盘：' + empty.filePath)
+  if (!/事件/.test(empty.error)) throw new Error('空事件的报错没说清原因：' + empty.error)
+  console.log('空事件 ok: ' + empty.error)
+
+  // ── 触发条件②：压力不达标、但会话已被压缩 ≥ maxCompactions 次时，必须自动交接 ──
+  const triggerDir = mkdtempSync(join(tmpdir(), 'dsh-handoff-trigger-'))
+  let preStep = null
+  const routes = new Map()
+  const triggerCtx = {
+    logger: { info() {}, warn() {}, error() {} },
+    connection: { fetch: { register(route) { routes.set(route.path, route) } } },
+    tools: { register() {} },
+    on(name, fn) { if (name === 'agent/pre-step') preStep = fn },
+    sessionTitle: { get: () => undefined, rename() {} },
+    // 压力远低于阈值 —— 唯一能触发的理由只剩「已压缩 2 次」
+    sessionProjections: { stateOf: () => ({ surfaceTokens: 10, contextWindow: 1000 }) },
+  }
+  await mod.apply(triggerCtx, { enabled: true, dryRun: true, maxCompactions: 2, thresholdRatio: 0.99, handoffDir: triggerDir })
+  if (!preStep) throw new Error('apply（enabled=true）没挂 agent/pre-step')
+  const squeezed = {
+    id: 'session-squeezed',
+    snapshotEvents: () => [
+      { type: 'compaction/summary', data: { summary: '第一次压缩' } },
+      { type: 'user/message', data: { content: [{ type: 'text', text: '原来的待办' }] } },
+      { type: 'compaction/summary', data: { summary: '第二次压缩' } },
+    ],
+  }
+  await preStep({ agent: { session: squeezed }, signal: { aborted: false } }, async () => {})
+  const statusRoute = routes.get('/api/handoff/status')
+  if (!statusRoute) throw new Error('apply 没注册 /api/handoff/status')
+  let fired = null
+  for (let i = 0; i < 60; i += 1) {
+    const snap = await (await statusRoute.fetch()).json()
+    if (snap.autoRuns > 0 && snap.lastResult) { fired = snap; break }
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  if (!fired) throw new Error('压过 2 次、压力不达标时没有触发自动交接')
+  const auto = fired.lastResult
+  if (auto.ok !== true || auto.dryRun !== true) throw new Error('自动交接结果不对：' + JSON.stringify(auto))
+  if (auto.compactions !== 2) throw new Error('自动交接没数出 2 次压缩：' + JSON.stringify(auto.compactions))
+  const squeezedBody = readFileSync(auto.filePath, 'utf8')
+  if (!/已被压缩：2 次/.test(squeezedBody)) throw new Error('交接包没写压缩次数')
+  if (!/触发原因：auto: 本会话已被压缩 2 次/.test(squeezedBody)) throw new Error('交接包的触发原因不是压缩次数：' + squeezedBody.split('\n')[3])
+  console.log('压缩触发 ok: ' + squeezedBody.split('\n')[3] + ' → ' + auto.filePath)
+  rmSync(triggerDir, { recursive: true, force: true })
+
   rmSync(outDir, { recursive: true, force: true })
 
   console.log('SELFCHECK OK（argv[1]= ' + process.argv[1] + '）')
