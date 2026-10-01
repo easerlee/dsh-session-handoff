@@ -190,6 +190,7 @@ window.__ModuleLoader__.load({
 
       let lastHandled = ''
       let running = true
+      let polling = false
       let statusFailed = ''
 
       const tick = async () => {
@@ -217,10 +218,20 @@ window.__ModuleLoader__.load({
       }
 
       const startPoll = () => {
+        if (polling) return
+        polling = true
         const timer = window.setInterval(tick, POLL_MS)
         const stop = () => { running = false; window.clearInterval(timer) }
         if (ctx && typeof ctx.effect === 'function') ctx.effect(() => stop, 'dsh-session-handoff: status poll')
         tick()
+      }
+
+      const adopt = (next) => {
+        if (target !== null) return false
+        target = next
+        report({ event: 'open-api-ready', method: next.service + '.' + next.method })
+        startPoll()
+        return true
       }
 
       if (target !== null) {
@@ -228,16 +239,29 @@ window.__ModuleLoader__.load({
         return
       }
 
-      // uiWorkspace 等视图服务可能比本模块晚注册：给一段时间反复重问，问到再开工。
-      // 问不到就当这一版 harness 没有公开导航接口 —— 不轮询，不做无用功。
+      // 视图服务比本模块晚注册是常态 —— 用 cordis 的正规等法（harness 自己就这么等 webServer/settings）。
+      let adopted = false
+      if (ctx && typeof ctx.inject === 'function') {
+        try {
+          ctx.inject(['uiWorkspace'], (scoped) => {
+            let value = null
+            try { value = scoped.uiWorkspace } catch {}
+            if (value && typeof value.openSession === 'function') {
+              adopted = adopt({ service: 'uiWorkspace', method: 'openSession', value })
+            }
+          })
+        } catch {}
+      }
+      if (adopted) return
+
+      // 退回：老版本形态 / 别的服务里找。给一段时间反复重问，问不到就报一次收工。
       let checks = 0
       const watcher = window.setInterval(() => {
         checks += 1
-        target = findSwitch(ctx)
-        if (target !== null) {
+        const found = findSwitch(ctx)
+        if (found !== null) {
           window.clearInterval(watcher)
-          report({ event: 'open-api-ready', method: target.service + '.' + target.method })
-          startPoll()
+          adopt(found)
           return
         }
         if (checks >= 15) {
@@ -245,7 +269,8 @@ window.__ModuleLoader__.load({
           report({ event: 'no-open-api', method: '' })
         }
       }, 2000)
-      if (ctx && typeof ctx.effect === 'function') ctx.effect(() => window.clearInterval(watcher), 'dsh-session-handoff: api watcher')
+      // 注意：ctx.effect 收的是「返回清理函数的 setup」，不能写成直接执行清理（那会在 apply 里就把 watcher 清掉）。
+      if (ctx && typeof ctx.effect === 'function') ctx.effect(() => () => window.clearInterval(watcher), 'dsh-session-handoff: api watcher')
     }
 
     exports.apply = apply

@@ -196,6 +196,8 @@ try {
   async function runClient(label, makeCtx, sessionId) {
     let clientModule = null
     const store = new Map()
+    const timers = new Map()
+    let nextTimer = 0
     const fakeWindow = {
       __ModuleLoader__: { load(spec) { clientModule = spec.factory(() => ({})) } },
       localStorage: {
@@ -203,8 +205,8 @@ try {
         setItem: (key, value) => store.set(key, String(value)),
         removeItem: (key) => store.delete(key),
       },
-      setInterval: () => 0,
-      clearInterval: () => {},
+      setInterval: (fn) => { nextTimer += 1; timers.set(nextTimer, fn); return nextTimer },
+      clearInterval: (id) => { timers.delete(id) },
       setTimeout: (fn, ms) => { setTimeout(fn, ms) },
     }
     const calls = []
@@ -220,13 +222,18 @@ try {
     if (clientModule === null) throw new Error(label + '：客户端模块没有调用 window.__ModuleLoader__.load')
     if (typeof clientModule.apply !== 'function') throw new Error(label + '：客户端模块没导出 apply')
     if (clientModule.inject.indexOf('sessions') < 0) throw new Error(label + '：客户端模块没有 inject sessions')
-    clientModule.apply(makeCtx(opened))
+    const ctx = makeCtx(opened)
+    // ctx.effect 按 cordis 语义：调用 setup，把返回的清理函数留存（apply 当场执行清理是 bug）。
+    const cleanups = []
+    ctx.effect = (setup) => { const cleanup = setup(); if (typeof cleanup === 'function') cleanups.push(cleanup) }
+    clientModule.apply(ctx)
     for (let i = 0; i < 60 && opened.length === 0; i += 1) await new Promise((resolve) => setTimeout(resolve, 25))
     if (opened.length !== 1 || opened[0] !== sessionId) throw new Error(label + '：没有切到新会话：' + JSON.stringify(opened))
     if (!calls.includes('/api/handoff/status')) throw new Error(label + '：没有轮询 /api/handoff/status')
     await new Promise((resolve) => setTimeout(resolve, 50))
     if (!calls.includes('/api/handoff/client')) throw new Error(label + '：没有把结果回报给宿主')
     if (store.get('dsh-session-handoff.opened.v1:' + sessionId) !== '1') throw new Error(label + '：没记下「已切过」，下次会重复跳')
+    if (timers.size === 0) throw new Error(label + '：apply 之后没有任何定时器在跑（清理函数是不是被当成 setup 执行了？）')
     console.log(label + ' ok: ' + sessionId + ' + 回报宿主')
   }
 
@@ -237,14 +244,20 @@ try {
       if (name === 'sessions') return { list: { getSnapshot: () => ({ byId: { 'session-child-a': {} } }) } }
       return undefined
     },
-    effect: () => {},
   }), 'session-child-a')
 
   // 退回路径：只有 sessions.open（老版本形态），仍然要能切。
   await runClient('客户端退回 sessions.open', (opened) => ({
     sessions: { open: (id) => { opened.push(id) } },
-    effect: () => {},
   }), 'session-child-b')
+
+  // 晚注册路径：apply 时 uiWorkspace 还不存在，靠 ctx.inject 等到它再开工。
+  await runClient('客户端晚注册 uiWorkspace', (opened) => ({
+    inject(deps, callback) {
+      setTimeout(() => callback({ uiWorkspace: { openSession: (id) => { opened.push(id) } } }), 30)
+    },
+    get() { return undefined },
+  }), 'session-child-c')
 
 
 
