@@ -25,7 +25,7 @@ dsh plugin --profile <你的 profile> add dsh-session-handoff
 - 桌面端的 profile 是 `desktop`，web 端是 `web`；一条命令会同时把包写进 `dependencies` 和
   `dsh.profile.bundles`，不用手动改文件
 - `dsh` 不在 PATH 上时，用它安装目录里的 `resources\runtime\cli\bin\dsh.cmd`
-- 不走 npm 也行：`add github:easerlee/dsh-handoff`（同样的代码，只是每次装都拉仓库）
+- 不走 npm 也行：`add github:easerlee/dsh-session-handoff`（同样的代码，只是每次装都拉仓库）
 - **改本地源码**用 `add link:/绝对路径/dsh-handoff`：`file:` 会被 pnpm 复制成快照，之后改源码不生效
 
 确认挂上了（web 端 / 命令行）：

@@ -5,13 +5,13 @@
   "main": "lib/index.js",
   "description": "DSH 插件：上下文压力到阈值时，把当前工作交接给一个新会话（文件式交接包 + handoff_now 工具 + HTTP 接口）。",
   "license": "MIT",
-  "homepage": "https://github.com/easerlee/dsh-handoff#readme",
+  "homepage": "https://github.com/easerlee/dsh-session-handoff#readme",
   "bugs": {
-    "url": "https://github.com/easerlee/dsh-handoff/issues"
+    "url": "https://github.com/easerlee/dsh-session-handoff/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/easerlee/dsh-handoff.git"
+    "url": "git+https://github.com/easerlee/dsh-session-handoff.git"
   },
   "keywords": [
     "dsh",
