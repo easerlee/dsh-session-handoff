@@ -12,6 +12,7 @@ reviewable handoff package**, leaving the old session untouched.
 - The package is **extracted mechanically from the session itself** (files it touched, recent messages,
   where the last message stopped) and written to disk for review
 - `handoff_now` tool in the desktop app (with a `dryRun` mode) / HTTP endpoints for `dsh web` and the CLI
+- Once the new session exists, **the UI switches to it by itself** (via the harness's `uiWorkspace.openSession`; web and desktop)
 - The old session is **only renamed with ` [已交接]`** — never archived, never deleted
 
 ## Install
@@ -125,8 +126,9 @@ to `disabled: true`, set `maxCompactions` to `0`, and keep `thresholdRatio` at t
 
 ## Known limitations
 
-1. **The UI does not switch for you** — the new session's id and title are returned; click over to it in
-   the session list
+1. **Automatic switching needs a navigation API from the harness** — it uses `uiWorkspace.openSession`;
+   when that API is absent (older harnesses) it neither switches nor errors, and
+   `$DSH_HOME/handoff-client-report.json` records the reason
 2. **The package is mechanically extracted, not model-summarised** — complex tasks may lose nuance
 3. The old session is renamed, not archived (intentional)
 4. The HTTP endpoints only act on sessions **live in that host process**: a freshly started instance with
