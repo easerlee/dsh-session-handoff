@@ -22,7 +22,7 @@ dsh plugin --profile <your profile> add dsh-session-handoff
 
 Then **restart DSH** — the bundle list is read once at startup.
 
-- The npm package is `dsh-session-handoff` (`dsh-session-handoff` was taken by another plugin)
+- The npm package is `dsh-session-handoff` (the name `dsh-handoff` was already taken by another plugin)
 - The desktop profile is `desktop`, the web one is `web`; the command writes the package into the
   profile's `dependencies` *and* `dsh.profile.bundles`, so no manual file editing is needed
 - If `dsh` is not on your PATH, use `resources\runtime\cli\bin\dsh.cmd` inside the install directory

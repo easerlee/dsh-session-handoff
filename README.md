@@ -21,7 +21,7 @@ dsh plugin --profile <你的 profile> add dsh-session-handoff
 
 装完**重启 DSH**——bundle 列表只在启动时读一次。
 
-- npm 包名是 `dsh-session-handoff`（`dsh-session-handoff` 已被另一个插件占用）
+- npm 包名是 `dsh-session-handoff`（`dsh-handoff` 这个名字已被另一个插件占用）
 - 桌面端的 profile 是 `desktop`，web 端是 `web`；一条命令会同时把包写进 `dependencies` 和
   `dsh.profile.bundles`，不用手动改文件
 - `dsh` 不在 PATH 上时，用它安装目录里的 `resources\runtime\cli\bin\dsh.cmd`
