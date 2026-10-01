@@ -3,6 +3,12 @@
   "version": "0.1.2",
   "type": "module",
   "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./client/index.js",
+    "./package.json": "./package.json",
+    "./lib/*": "./lib/*"
+  },
   "description": "DSH 插件：上下文压力到阈值时，把当前工作交接给一个新会话（文件式交接包 + handoff_now 工具 + HTTP 接口）。",
   "license": "MIT",
   "homepage": "https://github.com/easerlee/dsh-session-handoff#readme",
@@ -22,6 +28,7 @@
   ],
   "files": [
     "lib",
+    "client",
     "cordis.patch.yml",
     "README.md",
     "README.en.md",
@@ -42,6 +49,12 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime"
+      ],
+      "platform": "web"
     }
   }
 }

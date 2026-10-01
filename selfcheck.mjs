@@ -169,7 +169,64 @@ try {
   if (!/已被压缩：2 次/.test(squeezedBody)) throw new Error('交接包没写压缩次数')
   if (!/触发原因：auto: 本会话已被压缩 2 次/.test(squeezedBody)) throw new Error('交接包的触发原因不是压缩次数：' + squeezedBody.split('\n')[3])
   console.log('压缩触发 ok: ' + squeezedBody.split('\n')[3] + ' → ' + auto.filePath)
+
+  // ── 事件改名的静默失败：有 compaction/start、但一次 summary 都没数到 → 不许触发，且必须告警 ──
+  const renamed = {
+    id: 'session-renamed',
+    snapshotEvents: () => [
+      { type: 'compaction/start', data: {} },
+      { type: 'user/message', data: { content: [{ type: 'text', text: '待办' }] } },
+      { type: 'compaction/start', data: {} },
+      { type: 'compaction/end', data: {} },
+    ],
+  }
+  await preStep({ agent: { session: renamed }, signal: { aborted: false } }, async () => {})
+  await new Promise((resolve) => setTimeout(resolve, 150))
+  const renamedSnap = await (await statusRoute.fetch()).json()
+  if (!renamedSnap.compaction || renamedSnap.compaction.sessionId !== 'session-renamed') throw new Error('status 没带压缩计数：' + JSON.stringify(renamedSnap.compaction))
+  if (renamedSnap.compaction.summaries !== 0 || renamedSnap.compaction.starts !== 2) throw new Error('压缩计数不对：' + JSON.stringify(renamedSnap.compaction))
+  if (!/改名|失效/.test(renamedSnap.warning || '')) throw new Error('压缩事件改名时没有告警（会静默退化成只看压力）：' + JSON.stringify(renamedSnap.warning))
+  if (renamedSnap.autoRuns !== fired.autoRuns) throw new Error('压缩事件改名后仍然触发了交接：' + renamedSnap.autoRuns)
+  console.log('改名告警 ok: ' + renamedSnap.warning)
   rmSync(triggerDir, { recursive: true, force: true })
+
+  // ── 客户端半边：假 window + 假 fetch + 假 sessions，验「轮询 → 切到新会话」这条线 ──
+  const clientCode = readFileSync(new URL('./client/index.js', import.meta.url), 'utf8')
+  let clientModule = null
+  const store = new Map()
+  const fakeWindow = {
+    __ModuleLoader__: { load(spec) { clientModule = spec.factory(() => ({})) } },
+    localStorage: {
+      getItem: (key) => (store.has(key) ? store.get(key) : null),
+      setItem: (key, value) => store.set(key, String(value)),
+      removeItem: (key) => store.delete(key),
+    },
+    setInterval: () => 0,
+    clearInterval: () => {},
+    setTimeout: (fn, ms) => { setTimeout(fn, ms) },
+  }
+  const calls = []
+  const fakeFetch = async (url) => {
+    calls.push(String(url))
+    if (String(url).includes('/api/handoff/status')) {
+      return { ok: true, json: async () => ({ ok: true, lastResult: { ok: true, dryRun: false, newSessionId: 'session-child-1' } }) }
+    }
+    return { ok: true, json: async () => ({ ok: true }) }
+  }
+  const opened = []
+  new Function('window', 'fetch', 'console', 'setTimeout', clientCode)(fakeWindow, fakeFetch, console, setTimeout)
+  if (clientModule === null) throw new Error('客户端模块没有调用 window.__ModuleLoader__.load')
+  if (typeof clientModule.apply !== 'function') throw new Error('客户端模块没导出 apply')
+  if (clientModule.inject.indexOf('sessions') < 0) throw new Error('客户端模块没有 inject sessions')
+  clientModule.apply({ sessions: { binding: () => ({}), open: (id) => { opened.push(id) } }, effect: () => {} })
+  for (let i = 0; i < 60 && opened.length === 0; i += 1) await new Promise((resolve) => setTimeout(resolve, 25))
+  if (opened.length !== 1 || opened[0] !== 'session-child-1') throw new Error('客户端没有切到新会话：' + JSON.stringify(opened))
+  if (!calls.includes('/api/handoff/status')) throw new Error('客户端没有轮询 /api/handoff/status')
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  if (!calls.includes('/api/handoff/client')) throw new Error('客户端没有把结果回报给宿主')
+  if (store.get('dsh-session-handoff.opened.v1:session-child-1') !== '1') throw new Error('客户端没记下「已切过」，下次会重复跳')
+  console.log('客户端切会话 ok: sessions.open(' + opened[0] + ') + 回报宿主')
+
 
   rmSync(outDir, { recursive: true, force: true })
 
