@@ -31,7 +31,7 @@ window.__ModuleLoader__.load({
     const WAIT_ATTEMPTS = 12
     const WAIT_STEP_MS = 500
     // 每次回报都带上它 —— 界面里跑的到底是哪一版，一眼可见（脚本被缓存过时全靠它）。
-    const CLIENT_BUILD = 'client-2026-10-02d'
+    const CLIENT_BUILD = 'client-2026-10-02e'
 
     // 首选：视图所有者的公开导航接口（文档见 dsh-client-ui-workspace 的 navigation.d.ts）。
     const PREFERRED = [
