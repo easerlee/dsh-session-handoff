@@ -17,15 +17,6 @@ reviewable handoff package**, leaving the old session untouched.
 
 ## Install
 
-The desktop app and `dsh web` are **two independent DSH environments** (each with its own `$DSH_HOME`
-and `$DSH_HOME/profiles/<name>`). Installing into one does not affect the other — install once on
-each side you want it on. The profile name and the `dsh` you must use differ:
-
-| Side | Profile | Which `dsh` |
-|---|---|---|
-| Desktop app | `desktop` | the desktop app's **bundled command**: `<DSH install dir>\resources\runtime\cli\bin\dsh.cmd` |
-| `dsh web` | `web` | your own `dsh` (the one that starts `dsh web`) |
-
 ### Desktop app (profile `desktop`)
 
 ```cmd

@@ -16,14 +16,6 @@ DSH 插件：上下文压力到阈值时，把当前工作**交接给一个新�
 
 ## 安装
 
-桌面端和 web 端是**两套独立的 DSH 环境**（各有自己的 `$DSH_HOME` 和 `$DSH_HOME/profiles/<name>`），
-装一边不影响另一边 —— 哪边要用就在哪边装一次。两边的 profile 名和该用的 `dsh` 都不同：
-
-| 端 | profile 名 | 用哪个 `dsh` |
-|---|---|---|
-| 桌面端 | `desktop` | 桌面端**内置命令**：`<DSH 安装目录>\resources\runtime\cli\bin\dsh.cmd` |
-| web 端 | `web` | 你自己的 `dsh`（就是启动 `dsh web` 的那个） |
-
 ### 桌面端（profile `desktop`）
 
 ```cmd
