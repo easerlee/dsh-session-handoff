@@ -191,7 +191,7 @@ try {
   rmSync(triggerDir, { recursive: true, force: true })
 
   // ── 客户端半边：假 window + 假 fetch + 假 sessions，验「轮询 → 切到新会话」这条线 ──
-  const clientCode = readFileSync(new URL('./client/index.js', import.meta.url), 'utf8')
+  const clientCode = readFileSync(new URL('./client/handoff.js', import.meta.url), 'utf8')
   let clientModule = null
   const store = new Map()
   const fakeWindow = {

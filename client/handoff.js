@@ -24,6 +24,8 @@ window.__ModuleLoader__.load({
     const OPEN_METHODS = ['open', 'openSession', 'activate', 'select', 'show', 'focus']
     const WAIT_ATTEMPTS = 12
     const WAIT_STEP_MS = 500
+    // 每次回报都带上它 —— 界面里跑的到底是哪一版，一眼可见（浏览器缓存过旧 bundle 时全靠它）。
+    const CLIENT_BUILD = 'client-2026-10-02b'
 
     /** sessions 上第一个可用的「切过去」方法名；没有就返回空串。 */
     function openMethod(sessions) {
@@ -53,7 +55,7 @@ window.__ModuleLoader__.load({
         fetch('/api/handoff/client', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(Object.assign({ build: CLIENT_BUILD }, payload)),
         })
       } catch {}
     }
