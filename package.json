@@ -1,11 +1,11 @@
 {
   "name": "dsh-session-handoff",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
-    "./client": "./client/nav.js",
+    "./client": "./client/open.js",
     "./package.json": "./package.json",
     "./lib/*": "./lib/*"
   },

@@ -190,42 +190,62 @@ try {
   console.log('改名告警 ok: ' + renamedSnap.warning)
   rmSync(triggerDir, { recursive: true, force: true })
 
-  // ── 客户端半边：假 window + 假 fetch + 假 sessions，验「轮询 → 切到新会话」这条线 ──
-  const clientCode = readFileSync(new URL('./client/nav.js', import.meta.url), 'utf8')
-  let clientModule = null
-  const store = new Map()
-  const fakeWindow = {
-    __ModuleLoader__: { load(spec) { clientModule = spec.factory(() => ({})) } },
-    localStorage: {
-      getItem: (key) => (store.has(key) ? store.get(key) : null),
-      setItem: (key, value) => store.set(key, String(value)),
-      removeItem: (key) => store.delete(key),
-    },
-    setInterval: () => 0,
-    clearInterval: () => {},
-    setTimeout: (fn, ms) => { setTimeout(fn, ms) },
-  }
-  const calls = []
-  const fakeFetch = async (url) => {
-    calls.push(String(url))
-    if (String(url).includes('/api/handoff/status')) {
-      return { ok: true, json: async () => ({ ok: true, lastResult: { ok: true, dryRun: false, newSessionId: 'session-child-1' } }) }
+  // ── 客户端半边：假 window + 假 fetch + 假 ctx，验「轮询 → 切到新会话」这条线 ──
+  const clientCode = readFileSync(new URL('./client/open.js', import.meta.url), 'utf8')
+
+  async function runClient(label, makeCtx, sessionId) {
+    let clientModule = null
+    const store = new Map()
+    const fakeWindow = {
+      __ModuleLoader__: { load(spec) { clientModule = spec.factory(() => ({})) } },
+      localStorage: {
+        getItem: (key) => (store.has(key) ? store.get(key) : null),
+        setItem: (key, value) => store.set(key, String(value)),
+        removeItem: (key) => store.delete(key),
+      },
+      setInterval: () => 0,
+      clearInterval: () => {},
+      setTimeout: (fn, ms) => { setTimeout(fn, ms) },
     }
-    return { ok: true, json: async () => ({ ok: true }) }
+    const calls = []
+    const fakeFetch = async (url) => {
+      calls.push(String(url))
+      if (String(url).includes('/api/handoff/status')) {
+        return { ok: true, json: async () => ({ ok: true, lastResult: { ok: true, dryRun: false, newSessionId: sessionId } }) }
+      }
+      return { ok: true, json: async () => ({ ok: true }) }
+    }
+    const opened = []
+    new Function('window', 'fetch', 'console', 'setTimeout', clientCode)(fakeWindow, fakeFetch, console, setTimeout)
+    if (clientModule === null) throw new Error(label + '：客户端模块没有调用 window.__ModuleLoader__.load')
+    if (typeof clientModule.apply !== 'function') throw new Error(label + '：客户端模块没导出 apply')
+    if (clientModule.inject.indexOf('sessions') < 0) throw new Error(label + '：客户端模块没有 inject sessions')
+    clientModule.apply(makeCtx(opened))
+    for (let i = 0; i < 60 && opened.length === 0; i += 1) await new Promise((resolve) => setTimeout(resolve, 25))
+    if (opened.length !== 1 || opened[0] !== sessionId) throw new Error(label + '：没有切到新会话：' + JSON.stringify(opened))
+    if (!calls.includes('/api/handoff/status')) throw new Error(label + '：没有轮询 /api/handoff/status')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    if (!calls.includes('/api/handoff/client')) throw new Error(label + '：没有把结果回报给宿主')
+    if (store.get('dsh-session-handoff.opened.v1:' + sessionId) !== '1') throw new Error(label + '：没记下「已切过」，下次会重复跳')
+    console.log(label + ' ok: ' + sessionId + ' + 回报宿主')
   }
-  const opened = []
-  new Function('window', 'fetch', 'console', 'setTimeout', clientCode)(fakeWindow, fakeFetch, console, setTimeout)
-  if (clientModule === null) throw new Error('客户端模块没有调用 window.__ModuleLoader__.load')
-  if (typeof clientModule.apply !== 'function') throw new Error('客户端模块没导出 apply')
-  if (clientModule.inject.indexOf('sessions') < 0) throw new Error('客户端模块没有 inject sessions')
-  clientModule.apply({ sessions: { binding: () => ({}), open: (id) => { opened.push(id) } }, effect: () => {} })
-  for (let i = 0; i < 60 && opened.length === 0; i += 1) await new Promise((resolve) => setTimeout(resolve, 25))
-  if (opened.length !== 1 || opened[0] !== 'session-child-1') throw new Error('客户端没有切到新会话：' + JSON.stringify(opened))
-  if (!calls.includes('/api/handoff/status')) throw new Error('客户端没有轮询 /api/handoff/status')
-  await new Promise((resolve) => setTimeout(resolve, 50))
-  if (!calls.includes('/api/handoff/client')) throw new Error('客户端没有把结果回报给宿主')
-  if (store.get('dsh-session-handoff.opened.v1:session-child-1') !== '1') throw new Error('客户端没记下「已切过」，下次会重复跳')
-  console.log('客户端切会话 ok: sessions.open(' + opened[0] + ') + 回报宿主')
+
+  // 首选路径：视图所有者的公开导航接口（官方 UiWorkspace.openSession），必须优先用它。
+  await runClient('客户端首选 uiWorkspace.openSession', (opened) => ({
+    get(name) {
+      if (name === 'uiWorkspace') return { openSession: (id) => { opened.push(id) } }
+      if (name === 'sessions') return { list: { getSnapshot: () => ({ byId: { 'session-child-a': {} } }) } }
+      return undefined
+    },
+    effect: () => {},
+  }), 'session-child-a')
+
+  // 退回路径：只有 sessions.open（老版本形态），仍然要能切。
+  await runClient('客户端退回 sessions.open', (opened) => ({
+    sessions: { open: (id) => { opened.push(id) } },
+    effect: () => {},
+  }), 'session-child-b')
+
 
 
   rmSync(outDir, { recursive: true, force: true })
