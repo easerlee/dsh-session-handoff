@@ -134,12 +134,21 @@ window.__ModuleLoader__.load({
 
       let lastHandled = ''
       let running = true
+      let statusFailed = ''
 
       const tick = async () => {
         if (!running) return
         try {
           const response = await fetch('/api/handoff/status', { headers: { accept: 'application/json' } })
-          if (!response.ok) return
+          if (!response.ok) {
+            // 宿主插件没加载时这里是 404 —— 报一次，别让它静默。
+            if (statusFailed !== String(response.status)) {
+              statusFailed = String(response.status)
+              report({ event: 'status-failed', method, error: 'HTTP ' + statusFailed, api })
+            }
+            return
+          }
+          statusFailed = ''
           const snapshot = await response.json()
           const result = snapshot ? snapshot.lastResult : null
           if (!result || result.ok !== true || result.dryRun === true) return
