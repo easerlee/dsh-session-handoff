@@ -1,5 +1,5 @@
 /**
- * dsh-handoff 自检：只验最容易坏的地方 ——
+ * dsh-session-handoff 自检：只验最容易坏的地方 ——
  *  1. 能不能拿到 @deepseek-ai/dsh-llm 的 createUserMessage（交接最后一步靠它）
  *  2. 能不能拿到 @deepseek-ai/dsh-tools 的 defineTool，并把 handoff_now 真正定义出来
  *  3. handoff_now 的 execute / 输出契约（六个键都在）、dryRun 分支、render 跑得通
@@ -31,7 +31,7 @@ function checkKeys(value, label) {
 try {
   const mod = await import(new URL('./lib/index.js', import.meta.url))
 
-  if (mod.name !== 'dsh-handoff') throw new Error('name 不对：' + mod.name)
+  if (mod.name !== 'dsh-session-handoff') throw new Error('name 不对：' + mod.name)
   if (typeof mod.apply !== 'function') throw new Error('apply 缺失')
   if (mod.apply.constructor.name !== 'AsyncFunction') throw new Error('apply 必须是 async（工具注册要 await）')
   if (!Array.isArray(mod.inject) || mod.inject.indexOf('tools') < 0) throw new Error('inject 缺 tools')
@@ -73,7 +73,7 @@ try {
   if (!/^交接失败/.test(failed[0].text)) throw new Error('失败 render 不对：' + failed[0].text)
 
   // ── 假 ctx 真跑 apply：验「注册出去的那个工具」的接线 ──────────────────────
-  const outDir = mkdtempSync(join(tmpdir(), 'dsh-handoff-selfcheck-'))
+  const outDir = mkdtempSync(join(tmpdir(), 'dsh-session-handoff-selfcheck-'))
   let registered = null
   const ctx = {
     logger: { info() {}, warn() {}, error() {} },
@@ -94,7 +94,7 @@ try {
     // <you>/$id 占位串、带空格的真路径 —— 全都在线上真出过一次。
     snapshotEvents: () => [
       { type: 'tool/call', data: { name: 'pwsh', arguments: { command: 'Get-Item "E:/AO/ao-mcp-launcher.mjs 存在吗: "' } } },
-      { type: 'tool/call', data: { name: 'write', arguments: { file_path: 'E:/Legend of Lhoba/NewProject/a.txt', content: '见 E:/dsh-handoff（工作区外），装到 C:/Users/<you>/.dsh/plugins/dsh-handoff。' } } },
+      { type: 'tool/call', data: { name: 'write', arguments: { file_path: 'E:/Legend of Lhoba/NewProject/a.txt', content: '见 E:/dsh-session-handoff（工作区外），装到 C:/Users/<you>/.dsh/plugins/dsh-session-handoff。' } } },
     ],
   }
   const wired = await registered.execute({ reason: '接线自检', dryRun: true }, { agent: { session }, cwd: outDir })
@@ -126,7 +126,7 @@ try {
   console.log('空事件 ok: ' + empty.error)
 
   // ── 触发条件②：压力不达标、但会话已被压缩 ≥ maxCompactions 次时，必须自动交接 ──
-  const triggerDir = mkdtempSync(join(tmpdir(), 'dsh-handoff-trigger-'))
+  const triggerDir = mkdtempSync(join(tmpdir(), 'dsh-session-handoff-trigger-'))
   let preStep = null
   const routes = new Map()
   const triggerCtx = {

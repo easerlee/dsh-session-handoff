@@ -22,12 +22,12 @@ dsh plugin --profile <your profile> add dsh-session-handoff
 
 Then **restart DSH** — the bundle list is read once at startup.
 
-- The npm package is `dsh-session-handoff` (`dsh-handoff` was taken by another plugin)
+- The npm package is `dsh-session-handoff` (`dsh-session-handoff` was taken by another plugin)
 - The desktop profile is `desktop`, the web one is `web`; the command writes the package into the
   profile's `dependencies` *and* `dsh.profile.bundles`, so no manual file editing is needed
 - If `dsh` is not on your PATH, use `resources\runtime\cli\bin\dsh.cmd` inside the install directory
 - Without npm: `add github:easerlee/dsh-session-handoff` (same code, just pulled from the repo each time)
-- **Working on a local checkout?** use `add link:/absolute/path/to/dsh-handoff` — a `file:` dependency is
+- **Working on a local checkout?** use `add link:/absolute/path/to/dsh-session-handoff` — a `file:` dependency is
   copied by pnpm, so later source edits do not take effect
 
 Check it is live (web / CLI):
@@ -80,7 +80,7 @@ pressure-only trigger never gets its chance. How the two get along is below.
 In the profile's `cordis.patch.yml`:
 
 ```yaml
-- id: dsh-handoff
+- id: dsh-session-handoff
   config:
     enabled: true
     thresholdRatio: 0.85     # shipped default is 0.6; raise it when running with compaction
@@ -114,7 +114,7 @@ With both enabled, the thresholds differ:
 | | Threshold | Behaviour |
 |---|---|---|
 | `compaction-basic` | `0.6` (default) | Compress in place, the session keeps going |
-| `dsh-handoff` | `0.85` (suggested, above compaction) | Open a new session and hand off |
+| `dsh-session-handoff` | `0.85` (suggested, above compaction) | Open a new session and hand off |
 
 The shipped default is `0.6` as well, the same as compaction's. With both enabled, compaction always
 pushes pressure back below its own threshold first, so **a pressure-only trigger never gets its chance**.

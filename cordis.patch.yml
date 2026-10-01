@@ -1,3 +1,3 @@
 - insert:
-    - id: dsh-handoff
+    - id: dsh-session-handoff
       name: dsh-session-handoff
