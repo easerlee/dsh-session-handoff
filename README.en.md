@@ -27,8 +27,6 @@ Then **restart DSH** — the bundle list is read once at startup.
   profile's `dependencies` *and* `dsh.profile.bundles`, so no manual file editing is needed
 - If `dsh` is not on your PATH, use `resources\runtime\cli\bin\dsh.cmd` inside the install directory
 - Without npm: `add github:easerlee/dsh-session-handoff` (same code, just pulled from the repo each time)
-- **Working on a local checkout?** use `add link:/absolute/path/to/dsh-session-handoff` — a `file:` dependency is
-  copied by pnpm, so later source edits do not take effect
 
 Check it is live (web / CLI):
 
@@ -133,28 +131,6 @@ to `disabled: true`, set `maxCompactions` to `0`, and keep `thresholdRatio` at t
 3. The old session is renamed, not archived (intentional)
 4. The HTTP endpoints only act on sessions **live in that host process**: a freshly started instance with
    no session opened yet answers `没有可用会话（session 缺失）`
-
-## Development
-
-After changing the source, run the self-check (it really runs `apply`, the registered `handoff_now` tool,
-the `dryRun` branch and package writing):
-
-```powershell
-$env:ELECTRON_RUN_AS_NODE=1
-& "<DSH install dir>\DeepSeek Harness.exe" "<this repo>\selfcheck.mjs"
-```
-
-It has to run under the Electron runtime — packaged builds keep `@deepseek-ai/*` inside `app.asar`,
-which plain node cannot resolve. No extra setup is needed on packaged builds: the plugin resolves those
-modules through the harness entry point itself.
-
-⚠️ **With a `link:` install, unlink before switching install methods** — pnpm's `remove` can delete
-through the junction and affect files in the repository itself. Unlink first, then `add`:
-
-```powershell
-cmd /c rmdir "<profile dir>\node_modules\dsh-session-handoff"
-dsh plugin --profile <profile> add <new spec>
-```
 
 ## License
 

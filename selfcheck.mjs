@@ -11,6 +11,10 @@
  *
  *   $env:ELECTRON_RUN_AS_NODE=1
  *   & "<DSH 安装目录>\DeepSeek Harness.exe" "<本仓库>\selfcheck.mjs"
+ *
+ * link: 装法下换装法之前先断链：pnpm 的 remove 可能沿 junction 删除，删到仓库自身的文件。
+ *   cmd /c rmdir "<profile 目录>\node_modules\dsh-session-handoff"
+ *   dsh plugin --profile <profile> add <新的装法>
  */
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'

@@ -26,7 +26,6 @@ dsh plugin --profile <你的 profile> add dsh-session-handoff
   `dsh.profile.bundles`，不用手动改文件
 - `dsh` 不在 PATH 上时，用它安装目录里的 `resources\runtime\cli\bin\dsh.cmd`
 - 不走 npm 也行：`add github:easerlee/dsh-session-handoff`（同样的代码，只是每次装都拉仓库）
-- **改本地源码**用 `add link:/绝对路径/dsh-session-handoff`：`file:` 会被 pnpm 复制成快照，之后改源码不生效
 
 确认挂上了（web 端 / 命令行）：
 
@@ -128,26 +127,6 @@ curl http://127.0.0.1:<端口>/api/handoff/status
 3. 旧会话只改名不归档（有意）
 4. HTTP 接口只作用于**该宿主进程里活跃的会话**：刚起来、还没开过会话的实例会返回
    `没有可用会话（session 缺失）`
-
-## 开发
-
-改完源码先跑自检（真跑一遍 `apply`、注册出来的 `handoff_now` 工具、`dryRun` 分支和交接包落盘）：
-
-```powershell
-$env:ELECTRON_RUN_AS_NODE=1
-& "<DSH 安装目录>\DeepSeek Harness.exe" "<本仓库>\selfcheck.mjs"
-```
-
-必须用 Electron 运行时跑——打包版把 `@deepseek-ai/*` 放在 `app.asar` 里，普通 node 解不出来。
-插件在打包版下无需额外配置：它会自己从 harness 入口解析这些模块。
-
-⚠️ **`link:` 装法下切换安装方式前，先解除链接**：pnpm 的 `remove` 可能沿 junction 删除，影响仓库自身的文件。
-先断链，再 `add`：
-
-```powershell
-cmd /c rmdir "<profile 目录>\node_modules\dsh-session-handoff"
-dsh plugin --profile <profile> add <新的装法>
-```
 
 ## License
 
