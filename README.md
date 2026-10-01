@@ -16,16 +16,41 @@ DSH 插件：上下文压力到阈值时，把当前工作**交接给一个新�
 
 ## 安装
 
-```bash
-dsh plugin --profile <你的 profile> add dsh-session-handoff
+桌面端和 web 端是**两套独立的 DSH 环境**（各有自己的 `$DSH_HOME` 和 `$DSH_HOME/profiles/<name>`），
+装一边不影响另一边 —— 哪边要用就在哪边装一次。两边的 profile 名和该用的 `dsh` 都不同：
+
+| 端 | profile 名 | 用哪个 `dsh` |
+|---|---|---|
+| 桌面端 | `desktop` | 桌面端**内置命令**：`<DSH 安装目录>\resources\runtime\cli\bin\dsh.cmd` |
+| web 端 | `web` | 你自己的 `dsh`（就是启动 `dsh web` 的那个） |
+
+### 桌面端（profile `desktop`）
+
+```cmd
+"<DSH 安装目录>\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add dsh-session-handoff
 ```
 
-装完**重启 DSH**——bundle 列表只在启动时读一次。
+- `desktop` 是 Electron 保留的 profile，**只能用它自己那套内置命令**。别处装的 npm CLI 会直接拒绝：
+  `error: profile "desktop" is managed exclusively by the Electron application`
+- 先**打开过一次桌面端**（profile 才会被初始化），执行前**完全退出**它 —— profile 有写锁，不退出会一直等
+- 桌面端 `$DSH_HOME` 默认是 `%USERPROFILE%\.dsh`，profile 目录即 `%USERPROFILE%\.dsh\profiles\desktop`
+
+### web 端（profile `web`）
+
+```bash
+dsh plugin --profile web add dsh-session-handoff
+```
+
+- `web` profile **首次使用时自动初始化**，不用手工建；目录是 `$DSH_HOME/profiles/web`
+- web 端跑在独立 home 时（启动脚本里设了 `DSH_HOME`），要用**那一套**的 `dsh`/`dsh.cmd`，
+  否则会装进另一个 home
+
+### 两端都一样的地方
+
+装完**重启对应的那一端**——bundle 列表只在启动时读一次。其余：
 
 - npm 包名是 `dsh-session-handoff`（`dsh-handoff` 这个名字已被另一个插件占用）
-- 桌面端的 profile 是 `desktop`，web 端是 `web`；一条命令会同时把包写进 `dependencies` 和
-  `dsh.profile.bundles`，不用手动改文件
-- `dsh` 不在 PATH 上时，用它安装目录里的 `resources\runtime\cli\bin\dsh.cmd`
+- 一条命令会同时把包写进 profile 的 `dependencies` 和 `dsh.profile.bundles`，不用手动改文件
 - 不走 npm 也行：`add github:easerlee/dsh-session-handoff`（同样的代码，只是每次装都拉仓库）
 
 确认挂上了（web 端 / 命令行）：

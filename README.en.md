@@ -17,16 +17,47 @@ reviewable handoff package**, leaving the old session untouched.
 
 ## Install
 
-```bash
-dsh plugin --profile <your profile> add dsh-session-handoff
+The desktop app and `dsh web` are **two independent DSH environments** (each with its own `$DSH_HOME`
+and `$DSH_HOME/profiles/<name>`). Installing into one does not affect the other — install once on
+each side you want it on. The profile name and the `dsh` you must use differ:
+
+| Side | Profile | Which `dsh` |
+|---|---|---|
+| Desktop app | `desktop` | the desktop app's **bundled command**: `<DSH install dir>\resources\runtime\cli\bin\dsh.cmd` |
+| `dsh web` | `web` | your own `dsh` (the one that starts `dsh web`) |
+
+### Desktop app (profile `desktop`)
+
+```cmd
+"<DSH install dir>\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add dsh-session-handoff
 ```
 
-Then **restart DSH** — the bundle list is read once at startup.
+- `desktop` is the profile reserved for Electron, so **only the desktop app's own bundled command can
+  manage it**. An npm-installed CLI refuses outright:
+  `error: profile "desktop" is managed exclusively by the Electron application`
+- **Open the desktop app once first** (that initializes the profile), then **fully quit it** before
+  running the command — the profile has a write lock and will otherwise wait
+- The desktop `$DSH_HOME` defaults to `%USERPROFILE%\.dsh`, so the profile lives at
+  `%USERPROFILE%\.dsh\profiles\desktop`
+
+### `dsh web` (profile `web`)
+
+```bash
+dsh plugin --profile web add dsh-session-handoff
+```
+
+- The `web` profile **initializes itself on first use** — no manual setup; it lives at
+  `$DSH_HOME/profiles/web`
+- If your web install uses its own home (its launcher sets `DSH_HOME`), use **that install's**
+  `dsh`/`dsh.cmd`, otherwise the package lands in a different home
+
+### Both sides
+
+Then **restart the side you installed into** — the bundle list is read once at startup. Also:
 
 - The npm package is `dsh-session-handoff` (the name `dsh-handoff` was already taken by another plugin)
-- The desktop profile is `desktop`, the web one is `web`; the command writes the package into the
-  profile's `dependencies` *and* `dsh.profile.bundles`, so no manual file editing is needed
-- If `dsh` is not on your PATH, use `resources\runtime\cli\bin\dsh.cmd` inside the install directory
+- The command writes the package into the profile's `dependencies` *and* `dsh.profile.bundles`, so no
+  manual file editing is needed
 - Without npm: `add github:easerlee/dsh-session-handoff` (same code, just pulled from the repo each time)
 
 Check it is live (web / CLI):
