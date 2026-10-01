@@ -7,7 +7,8 @@
  *     （dryRun 只落盘、不建会话，所以假 ctx 够用）—— 这条专抓「参数没往下传」这类接线 bug
  *
  * 必须用 Electron 运行时跑：打包版把 @deepseek-ai/* 放在 app.asar 里，只有
- * Electron 的 fs 读得到。普通 node 跑必失败，那是环境不对，不是插件坏。
+ * Electron 的 fs 读得到。普通 node 跑必失败，那是环境不对，不是插件坏
+ * （拿普通 node 跑时，失败输出末尾会直接把下面这条重跑命令打出来）。
  *
  *   $env:ELECTRON_RUN_AS_NODE=1
  *   & "<DSH 安装目录>\DeepSeek Harness.exe" "<本仓库>\selfcheck.mjs"
@@ -19,6 +20,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 // 真跑的时候 argv[1] 是 harness 入口；独立跑时补上，让被测代码路径和线上一致。
 const hostEntry = join(dirname(process.execPath), 'resources', 'app.asar', 'dsh', 'node_modules', '@deepseek-ai', 'dsh-desktop-host', 'lib', 'index.js')
@@ -120,6 +122,51 @@ try {
   if (dirty.length > 0) throw new Error('文件清单里有垃圾条目：' + dirty.join(' | '))
   console.log('文件清单 ok: ' + listed.join(' | '))
   console.log('假 ctx 试跑 ok: ' + wired.filePath + '（' + body.length + ' 字），新标题「' + wired.newTitle + '」')
+
+  // ── 助手窗口：中间的决策句必须进包，纯工具轮不许占位，单条超长要截断 ──────
+  const filler = '长'.repeat(3000)
+  const chat = {
+    id: 'session-chat-0000',
+    snapshotEvents: () => [
+      { type: 'user/message', data: { content: [{ type: 'text', text: '第一件事' }] } },
+      { type: 'assistant/message', data: { message: { content: [{ type: 'text', text: '决策：这里改用 ctx.inject 等晚注册服务，因为直接 get 拿不到。' }] } } },
+      { type: 'assistant/message', data: { message: { content: [{ type: 'tool_use', name: 'pwsh' }] } } },
+      { type: 'assistant/message', data: { message: { content: [{ type: 'text', text: filler }] } } },
+      { type: 'assistant/message', data: { message: { content: [{ type: 'text', text: '最新一条：收尾。' }] } } },
+    ],
+  }
+  const chatRun = await registered.execute({ reason: '窗口自检', dryRun: true }, { agent: { session: chat }, cwd: outDir })
+  const chatBody = readFileSync(chatRun.filePath, 'utf8')
+  const win = (chatBody.match(/## 最近助手消息[\s\S]*?(?=\n## )/) || [''])[0]
+  if (!/决策：这里改用 ctx\.inject/.test(win)) throw new Error('助手窗口没带上中间的决策句：\n' + win)
+  const entries = (win.match(/^- 【\d+】/gm) || []).length
+  if (entries !== 2) throw new Error('助手窗口条数不对（纯工具轮不该占位，应为 2）：' + entries + '\n' + win)
+  if (chatBody.indexOf('长'.repeat(1000)) >= 0) throw new Error('单条助手消息没按 perItem 截断，一条日志就能吃掉整个窗口')
+  console.log('助手窗口 ok: 中间决策句在包里、纯工具轮未占位、单条已截断')
+
+  // ── 保新弃旧：maxChars 收紧时丢的必须是更早的消息，最新的永远在 ──────────
+  const budgetDir = mkdtempSync(join(tmpdir(), 'dsh-session-handoff-budget-'))
+  let budgetTool = null
+  await mod.apply({
+    logger: { info() {}, warn() {}, error() {} },
+    connection: { fetch: { register() {} } },
+    tools: { register(t) { budgetTool = t } },
+    on() {},
+    sessionTitle: { get: () => undefined },
+  }, { enabled: false, handoffDir: budgetDir, maxChars: 3000 })
+  const many = []
+  for (let i = 1; i <= 10; i += 1) {
+    many.push({ type: 'user/message', data: { content: [{ type: 'text', text: '用户第 ' + i + ' 件事 ' + 'x'.repeat(200) }] } })
+    many.push({ type: 'assistant/message', data: { message: { content: [{ type: 'text', text: '助手第 ' + i + ' 轮：' + 'y'.repeat(300) }] } } })
+  }
+  const bigRun = await budgetTool.execute({ reason: '预算自检', dryRun: true }, { agent: { session: { id: 'session-budget', snapshotEvents: () => many } }, cwd: budgetDir })
+  const bigBody = readFileSync(bigRun.filePath, 'utf8')
+  if (bigBody.length > 3200) throw new Error('窗口预算没生效，交接包仍然超 maxChars：' + bigBody.length + ' 字（maxChars=3000）')
+  if (!/助手第 10 轮/.test(bigBody)) throw new Error('保新弃旧失败：最新一条助手消息不在包里')
+  if (!/助手第 9 轮/.test(bigBody)) throw new Error('保新弃旧失败：助手窗口连最新一条都没保住')
+  if (/助手第 1 轮/.test(bigBody)) throw new Error('保新弃旧失败：最旧的助手消息还在，预算没起作用')
+  if (!/因预算未列出/.test(bigBody)) throw new Error('丢了消息却没写明原因')
+  console.log('保新弃旧 ok: 3000 字预算下「第 10/9 轮」在、「第 1 轮」不在，且写明了丢弃原因')
 
   // ── 空事件断言：读不到会话日志时必须失败，不许产出一份「全是（无）」的空壳包 ──
   const empty = await registered.execute({ reason: '空事件自检', dryRun: true }, { agent: { session: { id: 'session-empty', snapshotEvents: () => [] } }, cwd: outDir })
@@ -266,5 +313,13 @@ try {
   console.log('SELFCHECK OK（argv[1]= ' + process.argv[1] + '）')
 } catch (error) {
   console.error('SELFCHECK FAILED: ' + (error && error.stack ? error.stack : String(error)))
+  // 最常见的失败不是插件坏，是拿普通 node 跑了：打包版把 @deepseek-ai/* 放在 app.asar 里，
+  // 普通 node 的 fs 进不去（Electron 的 fs 打了 asar 补丁）。这里直接把重跑命令给出来。
+  if (/MODULE_NOT_FOUND|app\.asar/.test(String((error && error.message) || ''))) {
+    console.error('')
+    console.error('环境不对：这份自检必须跑在 DSH 自己的 Electron 里（普通 node 读不到 app.asar）。重跑：')
+    console.error('  $env:ELECTRON_RUN_AS_NODE=1')
+    console.error('  & "<DSH 安装目录>\\DeepSeek Harness.exe" "' + fileURLToPath(import.meta.url) + '"')
+  }
   process.exitCode = 1
 }

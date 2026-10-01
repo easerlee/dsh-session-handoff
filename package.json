@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-handoff",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

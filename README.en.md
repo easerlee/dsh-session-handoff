@@ -9,8 +9,8 @@ original history with a summary. This plugin takes the other road: **open a new 
 reviewable handoff package**, leaving the old session untouched.
 
 - Triggered by **real context pressure**, or by **how many times this session has been compacted** — not a guessed turn count
-- The package is **extracted mechanically from the session itself** (files it touched, recent messages,
-  where the last message stopped) and written to disk for review
+- The package is **extracted mechanically from the session itself** (files it touched, the last few user
+  and assistant messages, where the last message stopped) and written to disk for review
 - `handoff_now` tool in the desktop app (with a `dryRun` mode) / HTTP endpoints for `dsh web` and the CLI
 - Once the new session exists, **the UI switches to it by itself** (via the harness's `uiWorkspace.openSession`; web and desktop)
 - The old session is **only renamed with ` [已交接]`** — never archived, never deleted
@@ -121,12 +121,17 @@ In the profile's `cordis.patch.yml`:
 | `maxCompactions` | `2` | Hand off after this many compactions of the session (`0` = pressure only) |
 | `cooldownMs` | `300000` | Minimum gap between two handoffs of the same session |
 | `handoffDir` | `.dsh/handoff` | Where packages are written (relative to the workspace; absolute works too) |
-| `recentMessages` | `14` | How many recent user messages go into the package |
-| `maxChars` | `24000` | Character cap for the package |
+| `recentMessages` | `14` | How many user messages the user-message section carries (each clipped to 400 chars) |
+| `maxChars` | `24000` | Character cap for the package; the remainder is budgeted to the two message windows, and the older ones are dropped first |
 | `renameOldSuffix` | ` [已交接]` | Suffix appended to the old session's title |
 | `dryRun` | `false` | **true = write the package only, create no session** (useful for a first check) |
 
 ⚠️ A patch `config` **replaces the whole block** — when overriding, repeat every key you don't want to change.
+
+The assistant-message section has no count setting of its own: it takes whatever budget is left after the
+user-message section and fills it **from the newest backwards**, each message capped at 600 chars. When the
+budget runs out, the *older* messages are the ones dropped; the newest is always there (it is the
+"where it stopped" anchor).
 
 ## Relationship to compaction
 
@@ -151,10 +156,15 @@ to `disabled: true`, set `maxCompactions` to `0`, and keep `thresholdRatio` at t
 1. **Automatic switching needs a navigation API from the harness** — it uses `uiWorkspace.openSession`;
    when that API is absent (older harnesses) it neither switches nor errors, and
    `$DSH_HOME/handoff-client-report.json` records the reason
-2. **The package is mechanically extracted, not model-summarised** — complex tasks may lose nuance
+2. **The package is a mechanical extract of the original text, not a model summary** — the last few user
+   and assistant messages, the files touched and where it stopped are all carried (the decisions are in
+   those assistant messages, verbatim), but *which* of them matters is for the successor to judge
 3. The old session is renamed, not archived (intentional)
 4. The HTTP endpoints only act on sessions **live in that host process**: a freshly started instance with
    no session opened yet answers `没有可用会话（session 缺失）`
+5. **There is another plugin with the same name** — also called `dsh-session-handoff`, distributed as source
+   / tarball, triggered manually with `/handoff`, with a model-generated summary. The npm name is this one
+   (the one that triggers on its own)
 
 ## License
 
