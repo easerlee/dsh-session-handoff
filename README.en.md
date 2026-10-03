@@ -4,16 +4,25 @@ English | [中文](README.md)
 
 A DSH plugin that **hands the current work off to a fresh session** once context pressure reaches a threshold.
 
-Long sessions degrade near the end. DSH's built-in compaction compresses *in place* — it replaces the
-original history with a summary. This plugin takes the other road: **open a new session and carry over a
-reviewable handoff package**, leaving the old session untouched.
+Long sessions degrade near the end (author's own observation: "thinking but not outputting" starts around
+70% context). DSH's built-in compaction compresses *in place* — it replaces the original history with a
+summary. This plugin takes the other road: **open a new session and carry over a reviewable handoff
+package**, leaving the old session untouched.
 
 - Triggered by **real context pressure**, or by **how many times this session has been compacted** — not a guessed turn count
-- The package is **extracted mechanically from the session itself** (files it touched, the last few user
-  and assistant messages, where the last message stopped) and written to disk for review
+- The package is **extracted mechanically from the session itself** (files it touched, tools it used, the
+  last few user and assistant messages, where the last message stopped) and written to disk for review
 - `handoff_now` tool in the desktop app (with a `dryRun` mode) / HTTP endpoints for `dsh web` and the CLI
 - Once the new session exists, **the UI switches to it by itself** (via the harness's `uiWorkspace.openSession`; web and desktop)
 - The old session is **only renamed with ` [已交接]`** — never archived, never deleted
+
+## Requirements
+
+- Developed and verified on DSH desktop **0.2.0-rc.2**
+- Automatic switching relies on the harness's `uiWorkspace.openSession`; **older harnesses without that API
+  neither switch nor error** — the reason is written to `$DSH_HOME/handoff-client-report.json` (see
+  "Known limitations")
+- No separate Node install is needed — it uses the runtime bundled with DSH
 
 ## Install
 
@@ -58,6 +67,25 @@ curl "http://127.0.0.1:<port>/api/handoff/status"
 # {"ok":true,...,"tool":"registered"}   ← "registered" means the handoff_now tool is registered too
 ```
 
+## Uninstall
+
+```cmd
+:: desktop — same as install: fully quit the desktop app first, then use its own bundled command
+"<DSH install dir>\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop remove dsh-session-handoff
+```
+
+```bash
+# dsh web
+dsh plugin --profile web remove dsh-session-handoff
+```
+
+You can also just **turn it off** instead: set `enabled` to `false` in the profile's `cordis.patch.yml` —
+the plugin stays installed but stops handing off automatically (the `handoff_now` tool and the HTTP
+endpoints keep working).
+
+Restart that side afterwards, too. Uninstalling does not touch packages you already generated — files
+under `.dsh/handoff/` stay until you delete them.
+
 ## Usage
 
 ### Desktop: the `handoff_now` tool (recommended)
@@ -88,7 +116,7 @@ API calls are rejected before that). The desktop app has no address bar; trigger
 
 ### Automatic
 
-A handoff fires once cooldownMs has elapsed and either condition holds:
+A handoff fires once `cooldownMs` has elapsed and either condition holds:
 
 - pressure has reached `thresholdRatio`
 - **this session has been compacted `maxCompactions` times** (default 2)
@@ -133,6 +161,18 @@ user-message section and fills it **from the newest backwards**, each message ca
 budget runs out, the *older* messages are the ones dropped; the newest is always there (it is the
 "where it stopped" anchor).
 
+## What the package contains
+
+The file on disk is Markdown with four sections, all **extracted mechanically** from the session — no
+model involved:
+
+| Section | Content |
+|---|---|
+| Files it touched | Paths this session modified (up to 120) |
+| Tools used (count) | Top 12 tools by call count |
+| Recent messages | A user-message section plus an assistant-message section, each filled newest-first within its budget; older ones are dropped first |
+| Where it stopped | The last assistant message (clipped to 2000 chars) — where the successor picks up |
+
 ## Relationship to compaction
 
 With both enabled, the thresholds differ:
@@ -156,9 +196,10 @@ to `disabled: true`, set `maxCompactions` to `0`, and keep `thresholdRatio` at t
 1. **Automatic switching needs a navigation API from the harness** — it uses `uiWorkspace.openSession`;
    when that API is absent (older harnesses) it neither switches nor errors, and
    `$DSH_HOME/handoff-client-report.json` records the reason
-2. **The package is a mechanical extract of the original text, not a model summary** — the last few user
-   and assistant messages, the files touched and where it stopped are all carried (the decisions are in
-   those assistant messages, verbatim), but *which* of them matters is for the successor to judge
+2. **The package is a mechanical extract of the original text, not a model summary** — four sections: the
+   files touched, the tools used (with counts), the last few user/assistant messages, and where it
+   stopped. The decisions are in those assistant messages, verbatim, but *which* of them matters is for
+   the successor to judge
 3. The old session is renamed, not archived (intentional)
 4. The HTTP endpoints only act on sessions **live in that host process**: a freshly started instance with
    no session opened yet answers `没有可用会话（session 缺失）`
