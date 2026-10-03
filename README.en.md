@@ -1,4 +1,4 @@
-# dsh-session-handoff
+# dsh-session-shift
 
 English | [中文](README.md)
 
@@ -16,6 +16,38 @@ package**, leaving the old session untouched.
 - Once the new session exists, **the UI switches to it by itself** (via the harness's `uiWorkspace.openSession`; web and desktop)
 - The old session is **only renamed with ` [已交接]`** — never archived, never deleted
 
+## How is this different from the same-named plugins?
+
+There is a whole row of plugins called `dsh-session-handoff` (**this plugin used to be one of them; it was
+renamed to `dsh-session-shift` in 2026-10 because the name was too crowded**). Pick by what you want:
+
+| | Trigger | What gets handed over | Old session |
+|---|---|---|---|
+| **This plugin** | **Automatic**: context pressure hits the threshold, or the session has been compacted the maximum number of times (default 2) | **The original text, extracted mechanically** — files touched / tools used / last few messages / where it stopped. **No model involved** | Only renamed with ` [已交接]`; text untouched |
+| `WeiYe6/dsh-session-handoff` | Manual `/handoff` | **Model-generated** summary | New session with the summary injected |
+| `snow-The/dsh-session-handoff` | Manual export / resume | Structured handoff doc + context pruning | — |
+
+In one line: **want it to change shifts on its own with a verbatim package — use this one; want manual
+triggering plus a model summary — use those.**
+
+## Permissions and safety
+
+Once installed, this is everything it does:
+
+- Registers one tool, `handoff_now` (with a `dryRun` mode), plus two HTTP endpoints
+  (`GET /api/handoff/status`, `POST /api/handoff/run`)
+- At the threshold it **creates a new session automatically** and renames the current one with
+  ` [已交接]` (**never deletes, never archives, never rewrites the text**)
+- Writes files locally only: the project's `.dsh/handoff/` and `$DSH_HOME/handoff-client-report.json`
+- **No network calls, nothing sent anywhere, no credential access**
+
+Two things static scanners tend to misread, spelled out:
+
+- `cordis.patch.yml` is a **DSH profile config manifest** (it declares this plugin as one bundle row), **not
+  runtime code patching** — there is no monkey-patching anywhere in `lib/` or `client/`
+- `new Function` appears only in `selfcheck.mjs` (the self-test, which runs the client code against a fake
+  `window` to check the logic) — **the runtime never uses it**
+
 ## Requirements
 
 - Developed and verified on DSH desktop **0.2.0-rc.2**
@@ -29,7 +61,7 @@ package**, leaving the old session untouched.
 ### Desktop app (profile `desktop`)
 
 ```cmd
-"<DSH install dir>\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add dsh-session-handoff
+"<DSH install dir>\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add dsh-session-shift
 ```
 
 - `desktop` is the profile reserved for Electron, so **only the desktop app's own bundled command can
@@ -43,7 +75,7 @@ package**, leaving the old session untouched.
 ### `dsh web` (profile `web`)
 
 ```bash
-dsh plugin --profile web add dsh-session-handoff
+dsh plugin --profile web add dsh-session-shift
 ```
 
 - The `web` profile **initializes itself on first use** — no manual setup; it lives at
@@ -55,10 +87,11 @@ dsh plugin --profile web add dsh-session-handoff
 
 Then **restart the side you installed into** — the bundle list is read once at startup. Also:
 
-- The npm package is `dsh-session-handoff` (the name `dsh-handoff` was already taken by another plugin)
+- The npm package is `dsh-session-shift`. **The old name `dsh-session-handoff` is deprecated** — it is
+  marked deprecated on npm and installing it will tell you to switch; the code is identical
 - The command writes the package into the profile's `dependencies` *and* `dsh.profile.bundles`, so no
   manual file editing is needed
-- Without npm: `add github:easerlee/dsh-session-handoff` (same code, just pulled from the repo each time)
+- Without npm: `add github:easerlee/dsh-session-shift` (same code, just pulled from the repo each time)
 
 Check it is live (web / CLI):
 
@@ -71,12 +104,12 @@ curl "http://127.0.0.1:<port>/api/handoff/status"
 
 ```cmd
 :: desktop — same as install: fully quit the desktop app first, then use its own bundled command
-"<DSH install dir>\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop remove dsh-session-handoff
+"<DSH install dir>\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop remove dsh-session-shift
 ```
 
 ```bash
 # dsh web
-dsh plugin --profile web remove dsh-session-handoff
+dsh plugin --profile web remove dsh-session-shift
 ```
 
 You can also just **turn it off** instead: set `enabled` to `false` in the profile's `cordis.patch.yml` —
@@ -129,7 +162,7 @@ pressure-only trigger never gets its chance. How the two get along is below.
 In the profile's `cordis.patch.yml`:
 
 ```yaml
-- id: dsh-session-handoff
+- id: dsh-session-shift
   config:
     enabled: true
     thresholdRatio: 0.85     # shipped default is 0.6; raise it when running with compaction
@@ -180,7 +213,7 @@ With both enabled, the thresholds differ:
 | | Threshold | Behaviour |
 |---|---|---|
 | `compaction-basic` | `0.6` (default) | Compress in place, the session keeps going |
-| `dsh-session-handoff` | `0.85` (suggested, above compaction) | Open a new session and hand off |
+| `dsh-session-shift` | `0.85` (suggested, above compaction) | Open a new session and hand off |
 
 The shipped default is `0.6` as well, the same as compaction's. With both enabled, compaction always
 pushes pressure back below its own threshold first, so **a pressure-only trigger never gets its chance**.
@@ -203,9 +236,10 @@ to `disabled: true`, set `maxCompactions` to `0`, and keep `thresholdRatio` at t
 3. The old session is renamed, not archived (intentional)
 4. The HTTP endpoints only act on sessions **live in that host process**: a freshly started instance with
    no session opened yet answers `没有可用会话（session 缺失）`
-5. **There is another plugin with the same name** — also called `dsh-session-handoff`, distributed as source
-   / tarball, triggered manually with `/handoff`, with a model-generated summary. The npm name is this one
-   (the one that triggers on its own)
+5. **The ecosystem has several same-named and near-named plugins**: `WeiYe6/dsh-session-handoff` (manual
+   `/handoff`, model-generated summary), `snow-The/dsh-session-handoff` (structured handoff doc + context
+   pruning), and others. This plugin used to carry that name too; it was renamed to
+   **`dsh-session-shift`** in 2026-10 — see "How is this different from the same-named plugins?" above
 
 ## License
 

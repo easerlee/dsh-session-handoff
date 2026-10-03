@@ -1,4 +1,4 @@
-# dsh-session-handoff
+# dsh-session-shift
 
 [English](README.en.md) | 中文
 
@@ -14,6 +14,32 @@ DSH 插件：上下文压力到阈值时，把当前工作**交接给一个新�
 - 新会话建好后**界面自动切过去**（走 harness 的 `uiWorkspace.openSession`；web / 桌面端）
 - 旧会话**只改名加 ` [已交接]`**，不归档不删除
 
+## 和同名插件有什么区别？
+
+生态里叫 `dsh-session-handoff` 的插件有一串（**本插件原名也叫这个，2026-10 因重名过多更名 `dsh-session-shift`**）。按你要的东西挑：
+
+| | 触发 | 交接内容 | 旧会话 |
+|---|---|---|---|
+| **本插件** | **自动**：上下文压力到阈值，或本会话被压缩到上限（默认 2 次） | **机械提取原文**——改动过的文件 / 用过的工具 / 最近几轮消息 / 停在哪儿，**不过模型** | 只改名加 ` [已交接]`，原文不动 |
+| `WeiYe6/dsh-session-handoff` | 手动 `/handoff` | 由**模型**总结成摘要 | 新建会话注入摘要 |
+| `snow-The/dsh-session-handoff` | 手动导出 / 恢复 | 结构化交接文档 + 上下文裁剪 | — |
+
+一句话：**要"到点自己换班、交接包是原文不是摘要"，用这个；要"手动触发 + 模型总结"，用那些。**
+
+## 权限与安全
+
+装上以后它只会做这些事：
+
+- 注册一个工具 `handoff_now`（支持 `dryRun`）+ 两个 HTTP 接口（`GET /api/handoff/status`、`POST /api/handoff/run`）
+- 到阈值时**自动新建一个会话**，并把当前会话改名加 ` [已交接]`（**不删除、不归档、不动原文**）
+- 只在本地写文件：项目的 `.dsh/handoff/`、`$DSH_HOME/handoff-client-report.json`
+- **不联网、不外发任何数据、不读凭据**
+
+两个容易被静态扫描误读的地方，说清楚：
+
+- `cordis.patch.yml` 是 **DSH profile 的配置清单**（声明本插件作为一个 bundle 行挂载），**不是改运行时代码** —— 插件里的 `lib/`、`client/` 没有任何 monkey-patch
+- `new Function` 只出现在 `selfcheck.mjs`（自检脚本：在假 `window` 里跑客户端代码验证逻辑），**运行时一行都没有**
+
 ## 运行环境
 
 - 开发与验证环境：DSH 桌面端 **0.2.0-rc.2**
@@ -26,7 +52,7 @@ DSH 插件：上下文压力到阈值时，把当前工作**交接给一个新�
 ### 桌面端（profile `desktop`）
 
 ```cmd
-"<DSH 安装目录>\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add dsh-session-handoff
+"<DSH 安装目录>\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add dsh-session-shift
 ```
 
 - `desktop` 是 Electron 保留的 profile，**只能用它自己那套内置命令**。别处装的 npm CLI 会直接拒绝：
@@ -37,7 +63,7 @@ DSH 插件：上下文压力到阈值时，把当前工作**交接给一个新�
 ### web 端（profile `web`）
 
 ```bash
-dsh plugin --profile web add dsh-session-handoff
+dsh plugin --profile web add dsh-session-shift
 ```
 
 - `web` profile **首次使用时自动初始化**，不用手工建；目录是 `$DSH_HOME/profiles/web`
@@ -48,9 +74,9 @@ dsh plugin --profile web add dsh-session-handoff
 
 装完**重启对应的那一端**——bundle 列表只在启动时读一次。其余：
 
-- npm 包名是 `dsh-session-handoff`（`dsh-handoff` 这个名字已被另一个插件占用）
+- npm 包名是 `dsh-session-shift`。**旧名 `dsh-session-handoff` 已弃用** —— npm 上标了 deprecated，装旧名会提示改名，功能完全一样
 - 一条命令会同时把包写进 profile 的 `dependencies` 和 `dsh.profile.bundles`，不用手动改文件
-- 不走 npm 也行：`add github:easerlee/dsh-session-handoff`（同样的代码，只是每次装都拉仓库）
+- 不走 npm 也行：`add github:easerlee/dsh-session-shift`（同样的代码，只是每次装都拉仓库）
 
 确认挂上了（web 端 / 命令行）：
 
@@ -63,12 +89,12 @@ curl "http://127.0.0.1:<端口>/api/handoff/status"
 
 ```cmd
 :: 桌面端 —— 同样：先完全退出桌面端，再用它自己那套内置命令
-"<DSH 安装目录>\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop remove dsh-session-handoff
+"<DSH 安装目录>\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop remove dsh-session-shift
 ```
 
 ```bash
 # web 端
-dsh plugin --profile web remove dsh-session-handoff
+dsh plugin --profile web remove dsh-session-shift
 ```
 
 不想卸也可以**先关掉**：在 profile 的 `cordis.patch.yml` 里把 `enabled` 设成 `false`
@@ -120,7 +146,7 @@ curl http://127.0.0.1:<端口>/api/handoff/status
 在 profile 的 `cordis.patch.yml` 里：
 
 ```yaml
-- id: dsh-session-handoff
+- id: dsh-session-shift
   config:
     enabled: true
     thresholdRatio: 0.85     # 出厂默认 0.6；与 compaction 一起用时调高
@@ -168,7 +194,7 @@ curl http://127.0.0.1:<端口>/api/handoff/status
 | | 阈值 | 行为 |
 |---|---|---|
 | `compaction-basic` | `0.6`（默认） | 就地压缩，会话继续用 |
-| `dsh-session-handoff` | `0.85`（建议值，高于 compaction） | 开新会话交接 |
+| `dsh-session-shift` | `0.85`（建议值，高于 compaction） | 开新会话交接 |
 
 插件出厂默认也是 `0.6`，和 compaction 的默认阈值相同。两个都开着时，compaction 每次都会先把压力压回
 自己的阈值以下，所以只看压力的话**交接等不到触发点**。交接因此还看压缩次数：本会话被压过
@@ -186,8 +212,9 @@ curl http://127.0.0.1:<端口>/api/handoff/status
 3. 旧会话只改名不归档（有意）
 4. HTTP 接口只作用于**该宿主进程里活跃的会话**：刚起来、还没开过会话的实例会返回
    `没有可用会话（session 缺失）`
-5. **另有一个同名插件**：同样叫 `dsh-session-handoff`，走源码/tarball 分发，靠 `/handoff` 手动触发、
-   总结由模型生成；npm 上的这个名字是这份（带自动触发）
+5. **生态里有多个同名/近名插件**：`WeiYe6/dsh-session-handoff`（手动 `/handoff`、摘要由模型生成）、
+   `snow-The/dsh-session-handoff`（结构化交接文档 + 上下文裁剪）等。本插件原名也叫
+   `dsh-session-handoff`，因重名过多已于 2026-10 更名 **`dsh-session-shift`**；区别见上文「和同名插件有什么区别？」
 
 ## License
 

@@ -1,6 +1,6 @@
 {
-  "name": "dsh-session-handoff",
-  "version": "0.1.9",
+  "name": "dsh-session-shift",
+  "version": "0.2.0",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -9,22 +9,27 @@
     "./package.json": "./package.json",
     "./lib/*": "./lib/*"
   },
-  "description": "DSH 插件：上下文压力到阈值时，把当前工作交接给一个新会话（文件式交接包 + handoff_now 工具 + HTTP 接口）。",
+  "description": "DSH 插件：上下文压力到阈值、或本会话被压缩次数到上限时，自动把工作交接给一个新会话——交接包从会话机械提取（改动过的文件 / 用过的工具 / 最近几轮消息 / 停在哪儿），不过模型，落盘可审阅。",
   "license": "MIT",
-  "homepage": "https://github.com/easerlee/dsh-session-handoff#readme",
+  "homepage": "https://github.com/easerlee/dsh-session-shift#readme",
   "bugs": {
-    "url": "https://github.com/easerlee/dsh-session-handoff/issues"
+    "url": "https://github.com/easerlee/dsh-session-shift/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/easerlee/dsh-session-handoff.git"
+    "url": "git+https://github.com/easerlee/dsh-session-shift.git"
   },
   "keywords": [
     "dsh",
     "dsh-plugin",
     "handoff",
+    "handover",
     "session",
-    "context"
+    "shift",
+    "context",
+    "compaction",
+    "context-window",
+    "auto-handoff"
   ],
   "files": [
     "lib",

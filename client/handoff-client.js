@@ -1,5 +1,5 @@
 /**
- * dsh-session-handoff — web client（手写模块，无构建步骤）。
+ * dsh-session-shift — web client（手写模块，无构建步骤）。
  *
  * 只做一件事：宿主新建了交接会话之后，把界面切过去。
  *   1. 轮询宿主自己的 /api/handoff/status（同源，带 cookie），读到新的 newSessionId；
@@ -20,14 +20,14 @@
  * 免得下次还得靠猜。
  */
 window.__ModuleLoader__.load({
-  id: 'dsh-session-handoff',
+  id: 'dsh-session-shift',
   factory: () => {
     var module = { exports: {} }
     var exports = module.exports
     Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
 
     const POLL_MS = 2000
-    const OPENED_PREFIX = 'dsh-session-handoff.opened.v1'
+    const OPENED_PREFIX = 'dsh-session-shift.opened.v1'
     const WAIT_ATTEMPTS = 12
     const WAIT_STEP_MS = 500
     // 每次回报都带上它 —— 界面里跑的到底是哪一版，一眼可见（脚本被缓存过时全靠它）。
@@ -152,11 +152,11 @@ window.__ModuleLoader__.load({
       try {
         target.value[target.method](sessionId)
         markOpened(key)
-        console.info('[dsh-session-handoff] switched to ' + sessionId + ' via ' + target.service + '.' + target.method)
+        console.info('[dsh-session-shift] switched to ' + sessionId + ' via ' + target.service + '.' + target.method)
         report({ event: 'opened', sessionId, method: target.service + '.' + target.method })
       } catch (error) {
         clearMark(key)
-        console.warn('[dsh-session-handoff] switch failed: ' + String(error))
+        console.warn('[dsh-session-shift] switch failed: ' + String(error))
         report({ event: 'failed', sessionId, method: target.service + '.' + target.method, error: String(error) })
       }
     }
@@ -222,7 +222,7 @@ window.__ModuleLoader__.load({
         polling = true
         const timer = window.setInterval(tick, POLL_MS)
         const stop = () => { running = false; window.clearInterval(timer) }
-        if (ctx && typeof ctx.effect === 'function') ctx.effect(() => stop, 'dsh-session-handoff: status poll')
+        if (ctx && typeof ctx.effect === 'function') ctx.effect(() => stop, 'dsh-session-shift: status poll')
         tick()
       }
 
@@ -270,12 +270,12 @@ window.__ModuleLoader__.load({
         }
       }, 2000)
       // 注意：ctx.effect 收的是「返回清理函数的 setup」，不能写成直接执行清理（那会在 apply 里就把 watcher 清掉）。
-      if (ctx && typeof ctx.effect === 'function') ctx.effect(() => () => window.clearInterval(watcher), 'dsh-session-handoff: api watcher')
+      if (ctx && typeof ctx.effect === 'function') ctx.effect(() => () => window.clearInterval(watcher), 'dsh-session-shift: api watcher')
     }
 
     exports.apply = apply
     exports.inject = ['sessions']
-    exports.name = 'dsh-session-handoff-client'
+    exports.name = 'dsh-session-shift-client'
     return module.exports
   },
 })
